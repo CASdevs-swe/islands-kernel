@@ -1,0 +1,16 @@
+# secrets & token state — never commit
+*.age
+*.key
+*.local.json
+.env
+.env.*
+vault-store/
+*.sqlite
+*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+dist/
+.venv/
+*.egg-info/
