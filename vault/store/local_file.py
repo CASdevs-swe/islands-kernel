@@ -29,11 +29,13 @@ class LocalFileStore(Store):
 
     def _write_sealed(self, key: ConnKey, token: Token) -> None:
         p = self._tok_path(key)
-        fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        tmp = p.with_suffix(".tmp")
+        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         try:
             os.write(fd, seal_token(token, self.wrapper))
         finally:
             os.close(fd)
+        os.replace(str(tmp), str(p))  # atomic on POSIX; readers never see a truncated file
 
     def put_connection(self, conn: Connection) -> None:
         self._dir(conn.key).mkdir(parents=True, exist_ok=True)
@@ -66,9 +68,12 @@ class LocalFileStore(Store):
 
     def write_token(self, key: ConnKey, token: Token, now: float) -> None:
         self._write_sealed(key, token)
-        rec = json.loads(self._rec_path(key).read_text())
+        rp = self._rec_path(key)
+        rec = json.loads(rp.read_text())
         rec["updated_at"] = now
-        self._rec_path(key).write_text(json.dumps(rec))
+        tmp = rp.with_suffix(".tmp")
+        tmp.write_text(json.dumps(rec))
+        os.replace(str(tmp), str(rp))  # atomic on POSIX
 
     def acquire_lease(self, key: ConnKey, holder: str, until: float, now: float) -> bool:
         self._dir(key).mkdir(parents=True, exist_ok=True)
