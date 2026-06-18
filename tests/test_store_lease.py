@@ -41,3 +41,30 @@ def test_expired_lease_can_be_stolen(tmp_path):
     k = ConnKey("caput-venti", "fortnox", "559401-5157")
     assert s.acquire_lease(k, "h1", until=1500.0, now=1000.0) is True
     assert s.acquire_lease(k, "h2", until=3000.0, now=2000.0) is True    # h1's lease expired at 1500
+
+
+import pytest
+
+
+def _server_store(tmp_path):
+    import nacl.utils
+    from vault.crypto import SecretboxKeyWrapper
+    from vault.store.server import ServerStore
+    return ServerStore(conn_str=f"sqlite:///{tmp_path}/vault.sqlite",
+                       wrapper=SecretboxKeyWrapper(nacl.utils.random(32)))
+
+
+@pytest.fixture(params=["local", "server"])
+def any_store(request, tmp_path):
+    if request.param == "local":
+        return _store(tmp_path)
+    return _server_store(tmp_path)
+
+
+def test_lease_exclusive_any_backend(any_store):
+    any_store.put_connection(_conn())
+    k = ConnKey("caput-venti", "fortnox", "559401-5157")
+    assert any_store.acquire_lease(k, "h1", until=2000.0, now=1000.0) is True
+    assert any_store.acquire_lease(k, "h2", until=2000.0, now=1000.0) is False
+    any_store.release_lease(k, "h1")
+    assert any_store.acquire_lease(k, "h2", until=2000.0, now=1000.0) is True
