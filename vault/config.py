@@ -21,6 +21,12 @@ def _env_app_creds() -> dict[str, AppCred]:
             client_secret=os.environ["FORTNOX_CLIENT_SECRET"],
             redirect_uri=os.environ.get("FORTNOX_REDIRECT_URI", ""),
             scopes=os.environ.get("FORTNOX_SCOPES", "").split())
+    if os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"):
+        creds["gmail"] = AppCred(
+            client_id=os.environ["GOOGLE_CLIENT_ID"],
+            client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+            redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", ""),
+            scopes=os.environ.get("GOOGLE_SCOPES", "").split())
     return creds
 
 
