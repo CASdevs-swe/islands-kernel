@@ -87,9 +87,18 @@ def _build_from_env() -> AccessService:
     from vault.crypto import SecretboxKeyWrapper
     from vault.providers import PROVIDERS
     backend = os.environ.get("VAULT_BACKEND", "local")
-    # KEK: 32-byte base64 in VAULT_KEK (server); local backend uses age in production via config.
     kek_b64 = os.environ.get("VAULT_KEK")
-    kek = base64.b64decode(kek_b64) if kek_b64 else nacl.utils.random(32)
+    served = backend == "server" or os.environ.get("VAULT_REQUIRE_KERNEL") == "1"
+    if kek_b64:
+        kek = base64.b64decode(kek_b64)
+    elif served:
+        # A random KEK on a served store makes sealed envelopes unrecoverable across
+        # restarts. The KEK must come from the host secret store / KMS (see docs).
+        raise RuntimeError(
+            "VAULT_KEK is required when serving the vault "
+            "(VAULT_BACKEND=server or VAULT_REQUIRE_KERNEL=1)")
+    else:
+        kek = nacl.utils.random(32)
     wrapper = SecretboxKeyWrapper(kek)
     if backend == "server":
         from vault.store.server import ServerStore
