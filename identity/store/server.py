@@ -202,6 +202,9 @@ class ServerIdentityStore(IdentityStore):
                               json.dumps(new_token.refresh) if new_token.refresh is not None else None))
             self._db.commit()
 
+    def access_token_hashes(self):
+        return [r[0] for r in self._db.execute("SELECT hash FROM access_tokens").fetchall()]
+
     # --- logs ---
     def append_log(self, entry):
         with self._mu:

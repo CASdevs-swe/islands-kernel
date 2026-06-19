@@ -80,6 +80,9 @@ class InMemoryIdentityStore(IdentityStore):
             self._at.pop(old_hash, None)
             self._at[new_token.hash] = new_token
 
+    def access_token_hashes(self):
+        return list(self._at.keys())
+
     def append_log(self, entry):
         with self._mu: self._logs.append(entry)
     def read_log(self, principal_id):
