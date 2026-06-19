@@ -1,6 +1,11 @@
+import os
+import tempfile
+
 from identity.store.memory import InMemoryIdentityStore
+from identity.store.server import ServerIdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, GrantTarget, McpToken, AccessLog,
+    OAuthAuthCode,
 )
 
 
@@ -10,7 +15,9 @@ def _principal(pid="prn_1", email="a@b.se"):
 
 
 def _stores():
-    return [InMemoryIdentityStore()]
+    mem = InMemoryIdentityStore()
+    path = os.path.join(tempfile.mkdtemp(), "identity.sqlite")
+    return [mem, ServerIdentityStore(path)]
 
 
 def test_principal_put_get_and_by_email():
@@ -50,3 +57,21 @@ def test_log_is_append_only():
         s.append_log(AccessLog("prn_1", "org_1", "bk", "reconcile", 0.0))
         s.append_log(AccessLog("prn_1", "org_1", "bk", "reconcile", 1.0))
         assert len(s.read_log("prn_1")) == 2
+
+
+def test_consume_auth_code_single_use():
+    for s in _stores():
+        code = OAuthAuthCode(
+            hash="code_h1",
+            client_id="client_1",
+            principal_id="prn_1",
+            org_id="org_1",
+            code_challenge="ch",
+            audience="aud",
+            scope="openid",
+            expires_at=9999.0,
+            consumed_at=None,
+        )
+        s.put_auth_code(code)
+        assert s.consume_auth_code("code_h1", at=1.0) is True
+        assert s.consume_auth_code("code_h1", at=2.0) is False
