@@ -69,3 +69,15 @@ def test_collect_merges_identity_and_connection_grants():
                          connection_grants=[cg])
     kinds = {g.target.kind for g in out}
     assert kinds == {"island", "connection"}
+
+
+def test_org_grant_does_not_cover_different_org():
+    grants = [_grant("org", "org_1", "use")]
+    assert authorize(grants=grants, target=GrantTarget("connection", "conn_9"),
+                     access="use", now=10, request_org="org_2") is False
+
+
+def test_org_grant_does_not_cover_org_kind_target_via_nesting():
+    grants = [_grant("org", "org_1", "use")]
+    assert authorize(grants=grants, target=GrantTarget("org", "org_2"),
+                     access="use", now=10, request_org="org_2") is False
