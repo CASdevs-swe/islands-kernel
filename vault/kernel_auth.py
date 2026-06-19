@@ -37,7 +37,7 @@ def make_kernel_auth(*, jwks_provider: Callable[[], dict], audience: str, issuer
     def authorizer(*, conn, principal_id: str, org) -> bool:
         grants = _grants_for(principal_id, conn, identity_store, vault_store)
         return authorize(grants=grants, target=GrantTarget("connection", conn.id),
-                         access="use", now=now_fn(), request_org=org)
+                         access="use", now=now_fn(), request_org=conn.org)
 
     return require_principal, authorizer
 
@@ -48,7 +48,7 @@ def make_manage_authorizer(*, now_fn, identity_store, vault_store):
     def manage_authorizer(*, conn, principal_id: str, org) -> bool:
         grants = _grants_for(principal_id, conn, identity_store, vault_store)
         return authorize(grants=grants, target=GrantTarget("connection", conn.id),
-                         access="manage", now=now_fn(), request_org=org)
+                         access="manage", now=now_fn(), request_org=conn.org)
     return manage_authorizer
 
 
