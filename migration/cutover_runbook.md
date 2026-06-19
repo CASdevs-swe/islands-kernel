@@ -16,12 +16,26 @@ token: read it exactly once, import it once, never let two processes refresh it.
 2. Read the currently-valid token exactly once from the canonical live file,
    `bookkeeping-engine/.fortnox/tokens.local.json`, capturing `access_token`,
    `refresh_token`, `expires_at`, `scope`. Do NOT trigger a refresh while reading.
+   Immediately copy every live token file verbatim to a timestamped on-disk
+   backup OUTSIDE any repo (e.g. `~/.fortnox-cutover-backup/<ts>/`, mode 0600):
+   bookkeeping `.fortnox/tokens.local.json`, `bokforing/fortnox/tokens.age`, and
+   research `bokforing/fortnox/tokens.local.json`. The backup is the rollback
+   source of truth; it is never committed and is shredded once the cutover is
+   confirmed good.
 
 3. Import into the vault as the single connection
    `(caput-venti, fortnox, 559401-5157)`, `created_by="caput-venti"`,
    `rotation="rotating"`, `app_cred_ref="fortnox"`, using the production backend
    and KEK. Verify `get_access_token(...)` returns the imported access token
    WITHOUT refreshing (token still valid, outside the skew window).
+
+3.5 Live read-only check BEFORE any delete. Using the access token the vault
+   just handed out, make one read-only Fortnox API call (e.g.
+   `GET https://api.fortnox.se/3/companyinformation`, or `/3/financialyears`)
+   with the engine's existing auth header convention. Confirm HTTP 200 and a
+   sane body. This proves the imported token authenticates against LIVE Fortnox
+   end to end. No writes, no POST. If this call does not return 200, STOP: delete
+   nothing, restore from the step-2 backup if anything was moved, and abort.
 
 4. Point both repos at the vault by applying `bookkeeping_adapter.md` and
    `research_adapter.md`. Set `VAULT_URL` (or mount the local backend). Move the
@@ -46,9 +60,11 @@ token: read it exactly once, import it once, never let two processes refresh it.
 
 8. Resume writes. Re-enable the launchd agents / routines.
 
-9. Rollback: if anything looks wrong before step 8, restore the captured token to
-   the original file path, revert the two adapter edits, resume. Keep the captured
-   token in memory / secret store only — never commit it.
+9. Rollback: if anything looks wrong before step 8, restore the token files from
+   the step-2 on-disk backup to their original paths, revert the two adapter
+   edits, resume. The backup (not the vault) is the rollback source of truth.
+   Keep it out of any repo; never commit it; shred it only once the cutover is
+   confirmed good (step 7 passed and writes resumed).
 
 ## Approval gate
 
