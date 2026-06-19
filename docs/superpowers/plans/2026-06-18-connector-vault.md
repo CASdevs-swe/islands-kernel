@@ -1667,7 +1667,7 @@ class AccessService:
 Run: `.venv/bin/pytest tests/test_access_token.py -v`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add vault/access.py vault/config.py tests/test_access_token.py
@@ -1816,7 +1816,7 @@ from vault.model import ConnectionGrant
 Run: `.venv/bin/pytest tests/test_grants.py tests/test_access_token.py -v`
 Expected: PASS. (Update `test_access_token.py` fixtures so the principal is the owner `created_by`, or add a `use` grant — adjust those two tests to pass `principal_id="stub"` matching `created_by="stub"`.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add vault/grants.py vault/access.py tests/test_grants.py tests/test_access_token.py
@@ -1876,7 +1876,7 @@ def test_log_is_metadata_only_after_refresh():
 Run: `.venv/bin/pytest tests/test_access_log.py -v`
 Expected: PASS. If it fails because a token leaks into the log, fix `ConnectionAccessLog` construction — never widen the assertion.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit** (done)
 
 ```bash
 git add tests/test_access_log.py
@@ -1959,7 +1959,7 @@ Expected: FAIL (`revoke` missing).
 Run: `.venv/bin/pytest tests/test_revoke_zeroize.py -v`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add vault/access.py tests/test_revoke_zeroize.py
@@ -2103,7 +2103,7 @@ from vault.model import Connection, new_id
 Run: `.venv/bin/pytest tests/test_connect_oauth.py -v`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add vault/oauth_state.py vault/access.py tests/test_connect_oauth.py
@@ -2285,7 +2285,7 @@ Note: `app` is only constructed when `VAULT_BOOT=1` so importing `vault.app` in 
 Run: `.venv/bin/pytest tests/test_api.py -v` (add `httpx` already present; `fastapi[testclient]` provides `TestClient` — ensure `starlette`'s testclient dep `httpx` is installed, it is).
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done — routes use `{conn_id:path}` so the encoded id survives client %2F decoding)
 
 ```bash
 git add vault/app.py tests/test_api.py
@@ -2438,7 +2438,7 @@ dependencies = ["httpx>=0.27"]
 Run: `.venv/bin/pytest tests/test_lib_python.py -v`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add libs/python tests/test_lib_python.py
@@ -2550,7 +2550,7 @@ export async function getAccessToken(args: AccessArgs): Promise<string> {
 Run: `cd libs/node && npx vitest run`
 Expected: PASS, 1 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add libs/node
@@ -2652,7 +2652,7 @@ Register in `vault/providers/__init__.py`: `from vault.providers.gmail import Gm
 Run: `.venv/bin/pytest tests/test_gmail_provider.py -v && .venv/bin/pytest -v`
 Expected: PASS, and the whole suite green (parity + lease across both providers' shapes).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** (done)
 
 ```bash
 git add vault/providers/gmail.py vault/providers/__init__.py vault/config.py tests/test_gmail_provider.py
@@ -2715,7 +2715,7 @@ Document the precise change to make later, in the bookkeeping-engine repo (NOT n
 - List every file/path retired: `.fortnox/tokens.local.json`, `bokforing/fortnox/tokens.age`, `token_vault.py`'s standalone path.
 - State explicitly: this edit is applied during the gated cutover (Task 21), not now.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (done — fixtures only, not wired live)
 
 ```bash
 git add migration/bookkeeping_adapter.md tests/test_bookkeeping_adapter.py
@@ -2758,6 +2758,8 @@ Document, for later application in research-engine:
 Run: `.venv/bin/pytest tests/test_bookkeeping_adapter.py -v`
 Expected: PASS.
 
+(done — fixtures only, not wired live)
+
 ```bash
 git add migration/research_adapter.md tests/test_bookkeeping_adapter.py
 git commit -m "spec research vault adapter (same connection key as bookkeeping)"
@@ -2776,7 +2778,7 @@ git commit -m "spec research vault adapter (same connection key as bookkeeping)"
 
 **This task is a STOP. Build everything above first and show it green. Then ask for approval. Only after Sam says, in this session, "do the cutover," proceed — with writes paused.**
 
-- [ ] **Step 1: Write `migration/cutover_runbook.md` (this can be written now; executing it cannot)**
+- [x] **Step 1: Write `migration/cutover_runbook.md`** (done — spec only, executing it is still gated)
 
 The runbook, in order:
 1. **Pause writes.** Stop the bookkeeping launchd agents and any research routine that posts to Fortnox. Confirm nothing will call Fortnox during the window.
