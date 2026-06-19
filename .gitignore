@@ -1,6 +1,8 @@
 # secrets & token state — never commit
 *.age
 *.key
+*.ed25519
+kernel-keys/
 *.local.json
 .env
 .env.*
