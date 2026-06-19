@@ -14,3 +14,5 @@ node_modules/
 dist/
 .venv/
 *.egg-info/
+# one-shot migration helpers (hardcoded local paths; never committed)
+migration/_*.py
