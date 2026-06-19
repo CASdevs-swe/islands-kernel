@@ -1,0 +1,8 @@
+{
+  "name": "islands-vault",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "typescript": "^5.4", "vitest": "^1.6" }
+}
