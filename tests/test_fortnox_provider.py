@@ -24,3 +24,15 @@ def test_fortnox_refresh_rotates_and_sets_expiry():
 
 def test_fortnox_is_rotating():
     assert FortnoxProvider().rotation == "rotating"
+
+
+def test_fortnox_authorize_url_is_user_mode_no_service_account():
+    url = FortnoxProvider().authorize_url(
+        AppCred("cid", "secret", redirect_uri="http://localhost:8123/callback",
+                scopes=["bookkeeping", "invoice"]),
+        state="STATE", code_challenge=None)
+    # user-mode: Fortnox rejects account_type=service for this client
+    assert "account_type" not in url
+    assert "response_type=code" in url
+    assert "access_type=offline" in url      # required to receive a refresh token
+    assert "code_challenge" not in url       # confidential client, no PKCE

@@ -31,8 +31,11 @@ class FortnoxProvider(Provider):
         return self._parse(resp, now)
 
     def authorize_url(self, app, state, code_challenge):
-        # confidential client: no PKCE challenge
+        # Confidential client: no PKCE challenge. User-mode authorization (no
+        # account_type) — the Caput Venti app is not a service-account client,
+        # and Fortnox rejects account_type=service with
+        # error_client_not_allow_service_account.
         q = {"client_id": app.client_id, "redirect_uri": app.redirect_uri,
              "scope": " ".join(app.scopes), "state": state, "response_type": "code",
-             "access_type": "offline", "account_type": "service"}
+             "access_type": "offline"}
         return f"{AUTH_URL}?{urlencode(q)}"
