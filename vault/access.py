@@ -51,3 +51,11 @@ class AccessService:
         if not out and self.store.list_connections(org, provider):
             raise PermissionError(f"{principal_id} lacks manage on any matching connection")
         return out
+
+    def revoke(self, key: ConnKey, principal_id: str) -> dict:
+        conn = self.store.get_connection(key)
+        if conn is None:
+            raise KeyError(f"no connection for {key.as_str()}")
+        require_access(self.store, conn, principal_id, "manage")
+        self.store.delete_connection(key)
+        return {"revoked": conn.id}
