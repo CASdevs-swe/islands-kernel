@@ -43,6 +43,14 @@ same `Store` interface (`acquire_lease`/`release_lease`/`lease_held`) — the pa
 (`tests/test_refresh_single_writer.py`) is the contract that swap must keep green. Not
 built here.
 
+Both access-token route handlers (`access_token_authed` and `access_token_stub` in
+`vault/app.py`) are sync `def`, so Starlette runs them in its worker threadpool: concurrent
+HTTP callers run in parallel and the refresh lease — not event-loop serialization — is what
+enforces single-writer. This is intentional and applied to both handlers for one consistent
+execution model; observable behaviour/output is unchanged. Leaving either handler `async def`
+would block the event loop on the sync refresh and serialize all vault traffic, which silently
+stops protecting single-writer the moment a second worker or replica is added.
+
 ## Gated live cutover — DO NOT run autonomously; run with the human present
 
 Each step is a live-money action. Stop and confirm before each.
