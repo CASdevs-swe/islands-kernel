@@ -1,10 +1,11 @@
 from __future__ import annotations
-from vault.model import ConnKey, ConnectionAccessLog, ConnectionGrant
+from vault.model import ConnKey, ConnectionAccessLog, ConnectionGrant, Connection, new_id
 from vault.store.base import Store
 from vault.providers.base import Provider
 from vault.refresh import refresh_if_needed
 from vault.config import VaultConfig
 from vault.grants import require_access
+from vault.oauth_state import sign_state, verify_state
 
 
 class AccessService:
@@ -59,3 +60,26 @@ class AccessService:
         require_access(self.store, conn, principal_id, "manage")
         self.store.delete_connection(key)
         return {"revoked": conn.id}
+
+    def start_connect(self, org, provider, account, principal_id, code_challenge=None):
+        prov = self.providers[provider]
+        app = self.config.app_cred_for(provider, provider)
+        state = sign_state({"org": org, "provider": provider, "account": account,
+                            "principal": principal_id}, self.config.state_hmac_key)
+        return {"authorizeUrl": prov.authorize_url(app, state, code_challenge), "state": state}
+
+    def finish_connect(self, code, state, code_verifier=None):
+        data = verify_state(state, self.config.state_hmac_key)
+        provider = data["provider"]
+        prov = self.providers[provider]
+        app = self.config.app_cred_for(provider, provider)
+        now = self.config.now_fn()
+        token = prov.exchange_code(code, code_verifier, app, self.config.http_post, now)
+        key = ConnKey(data["org"], provider, data["account"])
+        conn = Connection(
+            id=new_id("conn", key.as_str()), org=data["org"], provider=provider,
+            account=data["account"], scopes=token.scope.split() if token.scope else app.scopes,
+            app_cred_ref=provider, token=token, rotation=prov.rotation, lease=None,
+            created_by=data["principal"], created_at=now, updated_at=now)
+        self.store.put_connection(conn)
+        return {"connectionId": conn.id}
