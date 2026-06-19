@@ -9,8 +9,18 @@ from __future__ import annotations
 from typing import Callable
 
 from identity.deps import make_require_principal
-from identity.authorize import authorize, collect_grants
+from identity.authorize import authorize, collect_grants, adapt_connection_grant
 from identity.model import GrantTarget
+
+
+def _grants_for(principal_id, conn, identity_store, vault_store):
+    grants = collect_grants(
+        principal_id=principal_id, identity_store=identity_store,
+        connection_grants=vault_store.get_grants(conn.id))
+    if principal_id == conn.created_by:
+        # the connection owner keeps slice-1 manage/use on the authed path
+        grants.append(adapt_connection_grant(None, owner_connection_id=conn.id))
+    return grants
 
 
 def make_kernel_auth(*, jwks_provider: Callable[[], dict], audience: str, issuer: str,
@@ -25,13 +35,21 @@ def make_kernel_auth(*, jwks_provider: Callable[[], dict], audience: str, issuer
         jwks_provider=jwks_provider, audience=audience, now_fn=now_fn, issuer=issuer)
 
     def authorizer(*, conn, principal_id: str, org) -> bool:
-        grants = collect_grants(
-            principal_id=principal_id, identity_store=identity_store,
-            connection_grants=vault_store.get_grants(conn.id))
+        grants = _grants_for(principal_id, conn, identity_store, vault_store)
         return authorize(grants=grants, target=GrantTarget("connection", conn.id),
                          access="use", now=now_fn(), request_org=org)
 
     return require_principal, authorizer
+
+
+def make_manage_authorizer(*, now_fn, identity_store, vault_store):
+    """A grant check for `manage` operations (grant / list / revoke), over the unified
+    Grant table plus the connection's own grants, with owner -> manage."""
+    def manage_authorizer(*, conn, principal_id: str, org) -> bool:
+        grants = _grants_for(principal_id, conn, identity_store, vault_store)
+        return authorize(grants=grants, target=GrantTarget("connection", conn.id),
+                         access="manage", now=now_fn(), request_org=org)
+    return manage_authorizer
 
 
 def cached_jwks_provider(url: str, http=None) -> Callable[[], dict]:
