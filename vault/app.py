@@ -1,7 +1,8 @@
 from __future__ import annotations
 import os
+from typing import Optional, Callable
 from urllib.parse import unquote
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from vault.model import ConnKey
 from vault.access import AccessService
 from vault.config import VaultConfig
@@ -12,7 +13,7 @@ def _parse_id(conn_id: str) -> ConnKey:
     return ConnKey(org, provider, account)
 
 
-def build_app(service: AccessService) -> FastAPI:
+def build_app(service: AccessService, *, require_principal: Optional[Callable] = None) -> FastAPI:
     app = FastAPI(title="islands-kernel connector vault")
 
     def guard(fn):
@@ -37,10 +38,17 @@ def build_app(service: AccessService) -> FastAPI:
         return guard(lambda: service.finish_connect(
             body["code"], body["state"], body.get("code_verifier")))
 
-    @app.post("/connections/{conn_id:path}/access-token")
-    async def access_token(conn_id: str, x_principal: str = Header("stub"),
-                           x_island: str = Header("unknown")):
-        return guard(lambda: service.get_access_token(_parse_id(conn_id), x_principal, x_island))
+    if require_principal is not None:
+        @app.post("/connections/{conn_id:path}/access-token")
+        async def access_token_authed(conn_id: str, claims=Depends(require_principal)):
+            principal = claims["sub"]
+            island = claims.get("aud", "unknown")
+            return guard(lambda: service.get_access_token(_parse_id(conn_id), principal, island))
+    else:
+        @app.post("/connections/{conn_id:path}/access-token")
+        async def access_token_stub(conn_id: str, x_principal: str = Header("stub"),
+                                    x_island: str = Header("unknown")):
+            return guard(lambda: service.get_access_token(_parse_id(conn_id), x_principal, x_island))
 
     @app.post("/connections/{conn_id:path}/grant")
     async def grant(conn_id: str, request: Request, x_principal: str = Header("stub")):
