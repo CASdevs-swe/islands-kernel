@@ -4,5 +4,6 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": { "test": "vitest run" },
+  "dependencies": { "jose": "^5.9.6" },
   "devDependencies": { "typescript": "^5.4", "vitest": "^1.6" }
 }
