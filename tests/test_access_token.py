@@ -24,15 +24,15 @@ def _service(now=1000.0):
 def test_access_token_response_has_no_refresh_token():
     svc, _ = _service()
     out = svc.get_access_token(ConnKey("caput-venti", "fortnox", "559401-5157"),
-                               principal_id="p1", island="bookkeeping")
+                               principal_id="stub", island="bookkeeping")
     assert out == {"accessToken": "ACCESS", "scope": "bookkeeping", "expiresAt": 99999.0}
     assert "refresh" not in str(out).lower()
 
 
 def test_access_token_writes_metadata_log():
     svc, store = _service()
-    svc.get_access_token(ConnKey("caput-venti", "fortnox", "559401-5157"), "p1", "bookkeeping")
+    svc.get_access_token(ConnKey("caput-venti", "fortnox", "559401-5157"), "stub", "bookkeeping")
     log = store.read_log("conn_1")[0]
-    assert (log.op, log.island, log.principal_id) == ("access-token", "bookkeeping", "p1")
+    assert (log.op, log.island, log.principal_id) == ("access-token", "bookkeeping", "stub")
     # metadata only
     assert "ACCESS" not in str(log) and "REFRESH" not in str(log)
