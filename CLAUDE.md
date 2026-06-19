@@ -21,3 +21,7 @@ vault/       — core package
 tests/       — pytest suite
 docs/        — plan and design documents
 ```
+
+Served posture: `identity.app:app` (IDENTITY_BOOT) and `vault.app:app`
+(VAULT_BOOT) are the uvicorn entrypoints. See `docs/server-posture-vault.md`
+for the env contract, secret custody, and the gated live-cutover runbook.
