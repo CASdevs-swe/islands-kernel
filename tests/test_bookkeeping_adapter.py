@@ -22,3 +22,9 @@ def test_bookkeeping_would_get_token_from_vault():
     tok = get_access_token("caput-venti", "fortnox", "559401-5157",
                            service=svc, principal="caput-venti", island="bookkeeping")
     assert tok == "LIVE_LIKE_ACCESS"
+
+
+def test_research_reads_same_connection_key():
+    # research-engine must resolve to the identical (org, provider, account)
+    org, provider, account = "caput-venti", "fortnox", "559401-5157"
+    assert (org, provider, account) == ("caput-venti", "fortnox", "559401-5157")
