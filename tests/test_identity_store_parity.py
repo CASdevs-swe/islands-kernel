@@ -5,7 +5,7 @@ from identity.store.memory import InMemoryIdentityStore
 from identity.store.server import ServerIdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, GrantTarget, McpToken, AccessLog,
-    OAuthAuthCode,
+    OAuthAuthCode, OAuthAccessToken,
 )
 
 
@@ -75,3 +75,39 @@ def test_consume_auth_code_single_use():
         s.put_auth_code(code)
         assert s.consume_auth_code("code_h1", at=1.0) is True
         assert s.consume_auth_code("code_h1", at=2.0) is False
+
+
+def test_access_token_json_round_trip_and_rotate():
+    for s in _stores():
+        tok = OAuthAccessToken(
+            hash="at_h1",
+            client_id="client_1",
+            principal_id="prn_1",
+            org_id="org_1",
+            audience="aud_1",
+            scope="openid profile",
+            expires_at=9999.0,
+            refresh={"hash": "rh", "expires_at": 9999.0},
+        )
+        s.put_access_token(tok)
+        got = s.get_access_token("at_h1")
+        assert got is not None
+        assert got.refresh == {"hash": "rh", "expires_at": 9999.0}
+        assert got.audience == "aud_1"
+        assert got.scope == "openid profile"
+
+        new_tok = OAuthAccessToken(
+            hash="at_h2",
+            client_id="client_1",
+            principal_id="prn_1",
+            org_id="org_1",
+            audience="aud_1",
+            scope="openid profile",
+            expires_at=19999.0,
+            refresh={"hash": "rh2", "expires_at": 19999.0},
+        )
+        s.rotate_refresh("at_h1", new_tok)
+        assert s.get_access_token("at_h1") is None
+        rotated = s.get_access_token("at_h2")
+        assert rotated is not None
+        assert rotated.refresh == {"hash": "rh2", "expires_at": 19999.0}

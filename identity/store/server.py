@@ -199,7 +199,7 @@ class ServerIdentityStore(IdentityStore):
                              (new_token.hash, new_token.client_id, new_token.principal_id,
                               new_token.org_id, new_token.audience, new_token.scope,
                               new_token.expires_at,
-                              json.dumps(new_token.refresh) if new_token.refresh else None))
+                              json.dumps(new_token.refresh) if new_token.refresh is not None else None))
             self._db.commit()
 
     # --- logs ---
