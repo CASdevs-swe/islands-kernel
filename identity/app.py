@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException, Body
 
 from identity.exchange import exchange, ExchangeError
@@ -63,3 +65,21 @@ def build_identity_app(*, store, key_manager, issuer: str, now_fn) -> FastAPI:
             raise HTTPException(400, str(e))
 
     return app
+
+
+def _build_identity_app_from_env() -> FastAPI:
+    import time
+    from identity.keys import KeyManager
+    from identity.store.server import ServerIdentityStore
+
+    seed = os.environ.get("KERNEL_SIGNING_SEED")
+    if not seed:
+        # The signing seed is a host-secret/KMS value, never a committed file.
+        raise RuntimeError("KERNEL_SIGNING_SEED is required to serve the identity kernel")
+    km = KeyManager.from_seed(os.environ.get("KERNEL_KID", "kid-1"), seed)
+    store = ServerIdentityStore(os.environ.get("KERNEL_IDENTITY_DB", "vault-store/identity.sqlite"))
+    return build_identity_app(store=store, key_manager=km,
+                              issuer=os.environ["KERNEL_ISSUER"], now_fn=time.time)
+
+
+app = _build_identity_app_from_env() if os.environ.get("IDENTITY_BOOT") == "1" else None
