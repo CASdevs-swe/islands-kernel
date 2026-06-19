@@ -30,7 +30,7 @@ def build_app(service: AccessService, *, require_principal: Optional[Callable] =
 
     if require_principal is not None:
         @app.post("/connections/{conn_id:path}/access-token")
-        async def access_token_authed(conn_id: str, claims=Depends(require_principal)):
+        def access_token_authed(conn_id: str, claims=Depends(require_principal)):
             principal = claims["sub"]
             org = claims.get("org")
             island = claims.get("aud", "unknown")
@@ -93,8 +93,8 @@ def build_app(service: AccessService, *, require_principal: Optional[Callable] =
                 body["code"], body["state"], body.get("code_verifier")))
 
         @app.post("/connections/{conn_id:path}/access-token")
-        async def access_token_stub(conn_id: str, x_principal: str = Header("stub"),
-                                    x_island: str = Header("unknown")):
+        def access_token_stub(conn_id: str, x_principal: str = Header("stub"),
+                              x_island: str = Header("unknown")):
             return guard(lambda: service.get_access_token(_parse_id(conn_id), x_principal, x_island))
 
         @app.post("/connections/{conn_id:path}/grant")

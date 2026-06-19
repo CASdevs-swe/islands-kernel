@@ -71,6 +71,8 @@ class CountingProvider(FortnoxProvider):
         with self._lock:
             self.calls += 1
             n = self.calls
+        import time
+        time.sleep(0.1)
         return Token(f"acc{n}", f"ref{n}", now + 3600, "bookkeeping")
 
 
