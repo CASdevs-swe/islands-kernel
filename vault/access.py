@@ -35,22 +35,32 @@ class AccessService:
             op="access-token", at=self.config.now_fn()))
         return {"accessToken": token.access_token, "scope": token.scope, "expiresAt": token.expires_at}
 
-    def grant(self, key: ConnKey, granter_id: str, principal_id: str, access, scopes_subset):
+    def grant(self, key: ConnKey, granter_id: str, principal_id: str, access, scopes_subset,
+              *, manage_check=None):
         conn = self.store.get_connection(key)
         if conn is None:
             raise KeyError(f"no connection for {key.as_str()}")
-        require_access(self.store, conn, granter_id, "manage")   # only manage can grant
+        if manage_check is not None:
+            if not manage_check(conn):
+                raise PermissionError(f"{granter_id} lacks manage on {conn.id}")
+        else:
+            require_access(self.store, conn, granter_id, "manage")
         g = ConnectionGrant(connection_id=conn.id, principal_id=principal_id, access=access,
                             scopes_subset=scopes_subset, granted_by=granter_id,
                             granted_at=self.config.now_fn())
         self.store.add_grant(g)
         return {"connectionId": conn.id, "principalId": principal_id, "access": access}
 
-    def list_connections(self, org: str, provider, principal_id: str) -> list[dict]:
+    def list_connections(self, org: str, provider, principal_id: str,
+                         *, manage_check=None) -> list[dict]:
         out = []
         for conn in self.store.list_connections(org, provider):
             try:
-                require_access(self.store, conn, principal_id, "manage")
+                if manage_check is not None:
+                    if not manage_check(conn):
+                        raise PermissionError("denied")
+                else:
+                    require_access(self.store, conn, principal_id, "manage")
             except PermissionError:
                 continue
             out.append({"id": conn.id, "org": conn.org, "provider": conn.provider,
@@ -59,11 +69,15 @@ class AccessService:
             raise PermissionError(f"{principal_id} lacks manage on any matching connection")
         return out
 
-    def revoke(self, key: ConnKey, principal_id: str) -> dict:
+    def revoke(self, key: ConnKey, principal_id: str, *, manage_check=None) -> dict:
         conn = self.store.get_connection(key)
         if conn is None:
             raise KeyError(f"no connection for {key.as_str()}")
-        require_access(self.store, conn, principal_id, "manage")
+        if manage_check is not None:
+            if not manage_check(conn):
+                raise PermissionError(f"{principal_id} lacks manage on {conn.id}")
+        else:
+            require_access(self.store, conn, principal_id, "manage")
         self.store.delete_connection(key)
         return {"revoked": conn.id}
 
