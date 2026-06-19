@@ -52,11 +52,13 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_principal(self, principal_id):
-        r = self._db.execute("SELECT * FROM principals WHERE id=?", (principal_id,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM principals WHERE id=?", (principal_id,)).fetchone()
         return self._principal(r)
 
     def get_principal_by_email(self, email):
-        r = self._db.execute("SELECT * FROM principals WHERE email=?", (email,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM principals WHERE email=?", (email,)).fetchone()
         return self._principal(r)
 
     @staticmethod
@@ -74,7 +76,8 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_org(self, org_id):
-        r = self._db.execute("SELECT * FROM orgs WHERE id=?", (org_id,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM orgs WHERE id=?", (org_id,)).fetchone()
         return Org(*r) if r else None
 
     # --- memberships ---
@@ -86,14 +89,16 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_membership(self, principal_id, org_id):
-        r = self._db.execute(
-            "SELECT * FROM memberships WHERE principal_id=? AND org_id=?",
-            (principal_id, org_id)).fetchone()
+        with self._mu:
+            r = self._db.execute(
+                "SELECT * FROM memberships WHERE principal_id=? AND org_id=?",
+                (principal_id, org_id)).fetchone()
         return self._membership(r)
 
     def list_memberships(self, principal_id):
-        rows = self._db.execute(
-            "SELECT * FROM memberships WHERE principal_id=?", (principal_id,)).fetchall()
+        with self._mu:
+            rows = self._db.execute(
+                "SELECT * FROM memberships WHERE principal_id=?", (principal_id,)).fetchall()
         return [self._membership(r) for r in rows]
 
     @staticmethod
@@ -119,8 +124,9 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def list_grants(self, principal_id):
-        rows = self._db.execute(
-            "SELECT * FROM grants WHERE principal_id=?", (principal_id,)).fetchall()
+        with self._mu:
+            rows = self._db.execute(
+                "SELECT * FROM grants WHERE principal_id=?", (principal_id,)).fetchall()
         return [Grant(id=r[0], principal_id=r[1],
                       target=GrantTarget(kind=r[2], id=r[3]), access=r[4],
                       scopes_subset=json.loads(r[5]) if r[5] else None,
@@ -135,7 +141,8 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_mcp_token(self, token_hash):
-        r = self._db.execute("SELECT * FROM mcp_tokens WHERE hash=?", (token_hash,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM mcp_tokens WHERE hash=?", (token_hash,)).fetchone()
         return McpToken(*r) if r else None
 
     # --- oauth clients ---
@@ -147,7 +154,8 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_oauth_client(self, client_id):
-        r = self._db.execute("SELECT * FROM oauth_clients WHERE id=?", (client_id,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM oauth_clients WHERE id=?", (client_id,)).fetchone()
         if r is None:
             return None
         return OAuthClient(id=r[0], name=r[1], redirect_uris=json.loads(r[2]),
@@ -162,7 +170,8 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_auth_code(self, code_hash):
-        r = self._db.execute("SELECT * FROM auth_codes WHERE hash=?", (code_hash,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM auth_codes WHERE hash=?", (code_hash,)).fetchone()
         return OAuthAuthCode(*r) if r else None
 
     def consume_auth_code(self, code_hash, at):
@@ -185,7 +194,8 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def get_access_token(self, token_hash):
-        r = self._db.execute("SELECT * FROM access_tokens WHERE hash=?", (token_hash,)).fetchone()
+        with self._mu:
+            r = self._db.execute("SELECT * FROM access_tokens WHERE hash=?", (token_hash,)).fetchone()
         if r is None:
             return None
         return OAuthAccessToken(hash=r[0], client_id=r[1], principal_id=r[2], org_id=r[3],
@@ -203,7 +213,9 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def access_token_hashes(self):
-        return [r[0] for r in self._db.execute("SELECT hash FROM access_tokens").fetchall()]
+        with self._mu:
+            rows = self._db.execute("SELECT hash FROM access_tokens").fetchall()
+        return [r[0] for r in rows]
 
     # --- logs ---
     def append_log(self, entry):
@@ -214,6 +226,7 @@ class ServerIdentityStore(IdentityStore):
             self._db.commit()
 
     def read_log(self, principal_id):
-        rows = self._db.execute("SELECT * FROM logs WHERE principal_id=?",
-                                (principal_id,)).fetchall()
+        with self._mu:
+            rows = self._db.execute("SELECT * FROM logs WHERE principal_id=?",
+                                    (principal_id,)).fetchall()
         return [AccessLog(*r) for r in rows]
