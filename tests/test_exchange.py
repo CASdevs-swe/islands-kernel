@@ -1,6 +1,6 @@
 import pytest
 from identity.store.memory import InMemoryIdentityStore
-from identity.model import McpToken, Membership, OAuthAccessToken
+from identity.model import McpToken, Membership, OAuthAccessToken, Principal
 from identity.tokens import hash_token
 from identity.exchange import exchange, ExchangeError
 
@@ -56,3 +56,26 @@ def test_oauth_access_token_path():
     s.put_membership(Membership("prn_2", "org_2", ["admin"], True, 0.0))
     out = exchange(opaque_token="at_xyz", audience="https://mcp.x", store=s, now=1000)
     assert out["principal_id"] == "prn_2" and out["roles"] == ["admin"]
+
+
+def test_type_is_service_when_principal_is_service():
+    s = _store_with_mcp()
+    s.put_principal(Principal(id="prn_1", type="service", email=None,
+                              display_name=None, public_key=None, created_at=0.0))
+    out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
+    assert out["type"] == "service"
+
+
+def test_type_is_human_when_principal_is_human():
+    s = _store_with_mcp()
+    s.put_principal(Principal(id="prn_1", type="human", email=None,
+                              display_name=None, public_key=None, created_at=0.0))
+    out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
+    assert out["type"] == "human"
+
+
+def test_type_defaults_to_human_when_no_principal_row():
+    s = _store_with_mcp()
+    # prn_1 has a token and membership but no Principal row in store
+    out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
+    assert out["type"] == "human"

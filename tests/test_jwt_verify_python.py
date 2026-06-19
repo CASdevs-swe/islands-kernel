@@ -48,3 +48,13 @@ def test_tampered_signature_is_rejected():
     with pytest.raises(ValueError):
         verify_island_jwt(_token(km_impostor), jwks=km1.jwks_document(),
                           audience="https://mcp.x", now=1100)
+
+
+def test_malformed_jwk_raises_value_error():
+    km = KeyManager.generate("kid-1")
+    token = _token(km)
+    # JWKS with the right kid but missing the "x" (public key) field
+    bad_jwks = {"keys": [{"kty": "OKP", "crv": "Ed25519", "kid": "kid-1",
+                           "alg": "EdDSA", "use": "sig"}]}
+    with pytest.raises(ValueError):
+        verify_island_jwt(token, jwks=bad_jwks, audience="https://mcp.x", now=1100)

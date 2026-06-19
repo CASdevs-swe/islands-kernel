@@ -21,5 +21,7 @@ def exchange(*, opaque_token: str, audience: str, store, now: float) -> dict:
 
     m = store.get_membership(row.principal_id, row.org_id) if row.org_id else None
     roles = m.roles if (m is not None and m.active) else []
+    principal = store.get_principal(row.principal_id)
+    typ = principal.type if principal is not None else "human"
     return {"principal_id": row.principal_id, "org_id": row.org_id,
-            "roles": roles, "sid": None}
+            "roles": roles, "sid": None, "type": typ}

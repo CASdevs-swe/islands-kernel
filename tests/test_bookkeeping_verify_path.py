@@ -1,4 +1,3 @@
-import pytest
 from identity.keys import KeyManager
 from identity.jwt_issuer import mint
 from islands_vault.verify import verify_island_jwt

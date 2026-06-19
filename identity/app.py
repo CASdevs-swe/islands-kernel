@@ -24,14 +24,15 @@ def build_identity_app(*, store, key_manager, issuer: str, now_fn) -> FastAPI:
 
     @app.post("/auth/exchange")
     async def auth_exchange(body: dict = Body(...)):
+        now = now_fn()
         try:
             resolved = exchange(opaque_token=body["opaque_token"],
-                                audience=body["audience"], store=store, now=now_fn())
+                                audience=body["audience"], store=store, now=now)
         except ExchangeError as e:
             raise HTTPException(400, str(e))
         token = mint(km=key_manager, issuer=issuer, sub=resolved["principal_id"],
-                     typ="human", audience=body["audience"], org=resolved["org_id"],
-                     roles=resolved["roles"], ttl=300, now=int(now_fn()),
+                     typ=resolved["type"], audience=body["audience"], org=resolved["org_id"],
+                     roles=resolved["roles"], ttl=300, now=int(now),
                      sid=resolved["sid"])
         return {"access_token": token, "token_type": "Bearer", "expires_in": 300}
 

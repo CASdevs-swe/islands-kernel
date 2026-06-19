@@ -7,7 +7,10 @@ from jwt.algorithms import OKPAlgorithm
 def _public_key_for_kid(jwks: dict, kid: str):
     for jwk in jwks.get("keys", []):
         if jwk.get("kid") == kid:
-            return OKPAlgorithm.from_jwk(jwk)
+            try:
+                return OKPAlgorithm.from_jwk(jwk)
+            except Exception as e:
+                raise ValueError(f"malformed JWK for kid={kid}: {e}")
     raise ValueError(f"no JWK for kid={kid}")
 
 
