@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK } from "jose";
 import { verifyIslandJwt } from "../src/verify";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 async function setup() {
   const { publicKey, privateKey } = await generateKeyPair("EdDSA", { crv: "Ed25519" });
@@ -38,4 +40,18 @@ describe("verifyIslandJwt", () => {
       jwks, audience: "https://mcp.x", now: 9999,
     })).rejects.toThrow();
   });
+});
+
+// Cross-language proof: the Python test (tests/test_cross_language.py) mints
+// a token from a throwaway fixed seed and writes tests/fixtures/cross_lang/token.json.
+// This test reads that same fixture and verifies the token in Node — same bytes,
+// both runtimes. Run pytest tests/ first to generate the fixture.
+it("verifies the cross-language golden token from the Python issuer", async () => {
+  const path = resolve(__dirname, "../../../tests/fixtures/cross_lang/token.json");
+  const fx = JSON.parse(readFileSync(path, "utf8"));
+  const claims = await verifyIslandJwt(fx.token, {
+    jwks: fx.jwks, audience: fx.audience, issuer: fx.issuer, now: fx.now,
+  });
+  expect(claims.sub).toBe("prn_1");
+  expect(claims.org).toBe("org_1");
 });
