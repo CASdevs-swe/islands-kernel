@@ -14,11 +14,17 @@ class AccessService:
         self.providers = providers
         self.config = config
 
-    def get_access_token(self, key: ConnKey, principal_id: str, island: str) -> dict:
+    def get_access_token(self, key: ConnKey, principal_id: str, island: str,
+                         *, grant_check=None) -> dict:
         conn = self.store.get_connection(key)
         if conn is None:
             raise KeyError(f"no connection for {key.as_str()}")
-        require_access(self.store, conn, principal_id, "use")
+        # grant_check (kernel authorize()) replaces the slice-1 require_access on the
+        # authed path; with no grant_check the legacy owner-or-connection-grant check stands.
+        if grant_check is not None:
+            grant_check(conn)
+        else:
+            require_access(self.store, conn, principal_id, "use")
         provider = self.providers[conn.provider]
         app = self.config.app_cred_for(conn.provider, conn.app_cred_ref)
         token = refresh_if_needed(self.store, key, provider, app,
