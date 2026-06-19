@@ -27,19 +27,27 @@ ACCOUNT = "559401-5157"
 ACCESS_PATH = "/connections/caput-venti%2Ffortnox%2F559401-5157/access-token"
 
 
-def free_port() -> int:
-    s = socket.socket()
+def bound_socket() -> tuple[socket.socket, int]:
+    """Return a TCP socket already bound to a free port on loopback.
+
+    The socket stays open so the OS keeps the port reserved until uvicorn
+    takes ownership, eliminating the TOCTOU window of the old close/rebind
+    pattern.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+    return s, s.getsockname()[1]
 
 
 class ThreadedServer:
-    def __init__(self, app, port: int):
-        cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    def __init__(self, app, sock: socket.socket):
+        cfg = uvicorn.Config(app, log_level="warning")
         self._srv = uvicorn.Server(cfg)
-        self._th = threading.Thread(target=self._srv.run, daemon=True)
+        self._sock = sock
+        self._th = threading.Thread(
+            target=self._srv.run, kwargs={"sockets": [sock]}, daemon=True
+        )
 
     def start(self):
         self._th.start()
@@ -88,8 +96,8 @@ class ServedStack:
 def build_served_stack(tmp_path, *, expired=False) -> ServedStack:
     import time
 
-    id_port = free_port()
-    vault_port = free_port()
+    id_sock, id_port = bound_socket()
+    vault_sock, vault_port = bound_socket()
     identity_url = f"http://127.0.0.1:{id_port}"
     vault_url = f"http://127.0.0.1:{vault_port}"
     issuer = identity_url
@@ -131,4 +139,4 @@ def build_served_stack(tmp_path, *, expired=False) -> ServedStack:
         return {"calls": provider.calls}
 
     return ServedStack(identity_url, vault_url, cred, audience, provider,
-                       ThreadedServer(identity_app, id_port), ThreadedServer(vault_app, vault_port))
+                       ThreadedServer(identity_app, id_sock), ThreadedServer(vault_app, vault_sock))
