@@ -73,6 +73,38 @@ def test_concurrent_refresh_runs_exactly_once(store):
     assert all(r.refresh_token == "ref1" for r in results)   # everyone sees the single rotated token
 
 
+def test_concurrent_refresh_runs_exactly_once_under_stress(store):
+    # Tight create/acquire contention is what flakes the file lease: many rounds,
+    # a fresh expired connection each round, exactly one refresh required every time.
+    key = ConnKey("caput-venti", "fortnox", "559401-5157")
+    app = AppCred("cid", "secret")
+    NOW = 1000.0
+    n_workers = 16
+
+    for round_no in range(60):
+        store.delete_connection(key)
+        store.put_connection(_expired_conn())
+        provider = CountingProvider()
+        barrier = threading.Barrier(n_workers)
+
+        def worker():
+            barrier.wait()
+            refresh_if_needed(
+                store, key, provider, app, http_post=lambda *a: {},
+                now_fn=lambda: NOW, skew=60, lease_ttl=30,
+                wait_timeout=20.0, sleep=lambda s: None,
+            )
+
+        threads = [threading.Thread(target=worker) for _ in range(n_workers)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert provider.calls == 1, f"round {round_no}: {provider.calls} refreshes"
+        assert store.get_connection(key).token.refresh_token == "ref1"
+
+
 def test_fresh_token_skips_refresh(store):
     c = _expired_conn()
     c.token = Token("a", "r", expires_at=99999.0, scope="s")

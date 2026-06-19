@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import os
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -29,13 +30,13 @@ class LocalFileStore(Store):
 
     def _write_sealed(self, key: ConnKey, token: Token) -> None:
         p = self._tok_path(key)
-        tmp = p.with_suffix(".tmp")
-        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # Unique temp per writer so concurrent sealers never collide on one path.
+        fd, tmp = tempfile.mkstemp(dir=str(p.parent), prefix=f"{key.account}.token.", suffix=".tmp")
         try:
             os.write(fd, seal_token(token, self.wrapper))
         finally:
             os.close(fd)
-        os.replace(str(tmp), str(p))  # atomic on POSIX; readers never see a truncated file
+        os.replace(tmp, str(p))  # atomic on POSIX; readers never see a truncated file
 
     def put_connection(self, conn: Connection) -> None:
         self._dir(conn.key).mkdir(parents=True, exist_ok=True)
@@ -75,24 +76,42 @@ class LocalFileStore(Store):
         tmp.write_text(json.dumps(rec))
         os.replace(str(tmp), str(rp))  # atomic on POSIX
 
+    def _lease_until(self, p: Path) -> Optional[float]:
+        # None means "present but content not parseable" — treat as a live lock,
+        # never as expired, so a lock seen mid-creation is never falsely stolen.
+        try:
+            return float(p.read_text().split("\n", 1)[1])
+        except (OSError, IndexError, ValueError):
+            return None
+
     def acquire_lease(self, key: ConnKey, holder: str, until: float, now: float) -> bool:
         self._dir(key).mkdir(parents=True, exist_ok=True)
         p = self._lock_path(key)
+        # Write the full lease content to a unique temp first, then publish it
+        # atomically. os.link makes existence and content appear together, so a
+        # concurrent acquirer can never read an empty half-created lock and steal it.
+        fd, tmp = tempfile.mkstemp(dir=str(self._dir(key)), prefix=f"{key.account}.lock.", suffix=".tmp")
         try:
-            fd = os.open(str(p), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             os.write(fd, f"{holder}\n{until}".encode())
             os.close(fd)
-            return True
-        except FileExistsError:
             try:
-                cur_until = float(p.read_text().split("\n", 1)[1])
-            except (OSError, IndexError, ValueError):
-                cur_until = 0.0
-            if cur_until > now:
-                return False
-            # expired — steal by overwriting
-            p.write_text(f"{holder}\n{until}")
-            return True
+                os.link(tmp, str(p))
+                return True
+            except FileExistsError:
+                cur_until = self._lease_until(p)
+                if cur_until is None or cur_until > now:
+                    return False
+                # Expired: publish our content atomically (last writer wins) and
+                # re-read to confirm we are the survivor — exactly one stealer wins.
+                os.replace(tmp, str(p))
+                tmp = None  # consumed by os.replace
+                try:
+                    return p.read_text().split("\n", 1)[0] == holder
+                except OSError:
+                    return False
+        finally:
+            if tmp is not None and os.path.exists(tmp):
+                os.unlink(tmp)
 
     def release_lease(self, key: ConnKey, holder: str) -> None:
         p = self._lock_path(key)
@@ -106,10 +125,9 @@ class LocalFileStore(Store):
         p = self._lock_path(key)
         if not p.exists():
             return False
-        try:
-            return float(p.read_text().split("\n", 1)[1]) > now
-        except (OSError, IndexError, ValueError):
-            return False
+        cur_until = self._lease_until(p)
+        # Unparseable (mid-creation) counts as held, mirroring acquire_lease.
+        return cur_until is None or cur_until > now
 
     def delete_connection(self, key: ConnKey) -> None:
         tok = self._tok_path(key)
