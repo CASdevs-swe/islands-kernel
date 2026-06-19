@@ -17,7 +17,7 @@ def _grants_for(principal_id, conn, identity_store, vault_store):
     grants = collect_grants(
         principal_id=principal_id, identity_store=identity_store,
         connection_grants=vault_store.get_grants(conn.id))
-    if principal_id == conn.created_by:
+    if principal_id and principal_id == conn.created_by:
         # the connection owner keeps slice-1 manage/use on the authed path
         grants.append(adapt_connection_grant(None, owner_connection_id=conn.id))
     return grants

@@ -50,3 +50,20 @@ def test_owner_can_manage_and_use():
         issuer="https://id.local", now_fn=lambda: 1000.0,
         identity_store=ident, vault_store=vault)
     assert use_authorizer(conn=conn, principal_id="prn_owner", org="caput-venti") is True
+
+
+def test_blank_principal_does_not_get_owner_grant():
+    # Connection whose created_by is blank — owner injection must NOT fire for "" == "".
+    ident = InMemoryIdentityStore()
+    vault = InMemoryStore()
+    conn = _conn(created_by="")
+    vault.put_connection(conn)
+
+    mgr = make_manage_authorizer(now_fn=lambda: 1000.0, identity_store=ident, vault_store=vault)
+    assert mgr(conn=conn, principal_id="", org="caput-venti") is False
+
+    _, use_authorizer = make_kernel_auth(
+        jwks_provider=lambda: {"keys": []}, audience="https://vault.local",
+        issuer="https://id.local", now_fn=lambda: 1000.0,
+        identity_store=ident, vault_store=vault)
+    assert use_authorizer(conn=conn, principal_id="", org="caput-venti") is False
