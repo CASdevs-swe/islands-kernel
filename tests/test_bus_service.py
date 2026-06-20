@@ -58,8 +58,11 @@ def test_republish_same_id_is_deduped_no_redispatch():
 
 def test_publish_without_grant_is_denied():
     svc, store, deliv = _service([])  # no grants
+    fired = []
+    deliv.register("h1", lambda e: fired.append(e.id))
     with pytest.raises(AuthzDenied):
         svc.publish(_body(), principal="prn_a", org="org_1")
+    assert fired == [], "handler must not fire when publish is denied before dispatch"
 
 
 def test_subscribe_without_grant_is_denied():
@@ -67,6 +70,7 @@ def test_subscribe_without_grant_is_denied():
     with pytest.raises(AuthzDenied):
         svc.subscribe(principal="prn_a", org="org_1", type="bookkeeping.voucher.posted",
                       consumer="smartcharge", target={"kind": "inprocess", "key": "h1"}, grant_ref="g")
+    assert svc.list_subscriptions("org_1") == [], "subscription must not be persisted when denied"
 
 
 def test_event_not_delivered_across_orgs():
