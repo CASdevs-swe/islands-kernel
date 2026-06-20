@@ -45,7 +45,7 @@ class ServerLedgerStore(LedgerStore):
                 (event.source, event.id, event.type, event.schema, event.org,
                  event.principal, event.occurred_at,
                  json.dumps(event.trace), json.dumps(event.data)))
-        return cur.rowcount == 1
+            return cur.rowcount == 1
 
     def get_event(self, source: str, event_id: str) -> Optional[Event]:
         with self._mu:
