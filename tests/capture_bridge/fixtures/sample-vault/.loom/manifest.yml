@@ -1,0 +1,14 @@
+version: 1
+raw_dir: raw
+policy:
+  layout_mode: wiki-tree
+  anonymize: true
+  forbidden_strings: [ACME]
+routing:
+  work-task:       { surface: notion-work,         target: team }
+  personal-task:   { surface: todo-manager,        target: private }
+  meal:            { surface: food-log,            target: private }
+  goal:            { surface: goal-set,            target: private }
+  event:           { surface: calendar-planner,    target: private }
+  team-knowledge:  { surface: vault-ingest,        target: team }
+  private-journal: { surface: private-vault-query, target: private }

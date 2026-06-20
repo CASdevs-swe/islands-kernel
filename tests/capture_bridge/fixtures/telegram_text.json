@@ -1,0 +1,17 @@
+{
+  "type": "inbound.message.telegram.received",
+  "schema": "inbound-message/v1",
+  "source": "connector:telegram",
+  "occurredAt": "2025-06-15T14:26:40+02:00",
+  "trace": { "store": "telegram", "ref": "999:42" },
+  "data": {
+    "channel": "telegram",
+    "text": "kom ihag att kopa mjolk",
+    "lang": "text",
+    "channelMsgId": 42,
+    "channelChatId": 999,
+    "sender": { "channel": "telegram", "channelUserId": 111 },
+    "attachments": [],
+    "capturedAt": "2025-06-15T14:26:40+02:00"
+  }
+}
