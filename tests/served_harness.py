@@ -142,3 +142,83 @@ def build_served_stack(tmp_path, *, expired=False) -> ServedStack:
 
     return ServedStack(identity_url, vault_url, cred, audience, provider,
                        ThreadedServer(identity_app, id_sock), ThreadedServer(vault_app, vault_sock))
+
+
+from datetime import datetime, timezone
+
+from identity.deps import make_require_principal
+from identity.authorize import collect_grants
+from bus.store.server import ServerLedgerStore
+from bus.schema_registry import SchemaRegistry
+from bus.dispatch import Dispatcher, InProcessDelivery
+from bus.service import BusService
+from bus.app import build_bus_app
+from bus.provisioning import grant_event_type_use
+
+
+@dataclass
+class ServedBusStack:
+    identity_url: str
+    bus_url: str
+    cred: str
+    audience: str
+    store: ServerLedgerStore
+    counter: dict
+    _identity_srv: ThreadedServer
+    _bus_srv: ThreadedServer
+
+    def start(self):
+        self._identity_srv.start()
+        self._bus_srv.start()
+
+    def stop(self):
+        self._bus_srv.stop()
+        self._identity_srv.stop()
+
+
+def build_served_bus_stack(tmp_path) -> ServedBusStack:
+    import time
+
+    id_sock, id_port = bound_socket()
+    bus_sock, bus_port = bound_socket()
+    identity_url = f"http://127.0.0.1:{id_port}"
+    bus_url = f"http://127.0.0.1:{bus_port}"
+    issuer = identity_url
+    audience = "bus"
+    now = time.time()
+
+    km = KeyManager.generate("kid-bus")
+    ident = ServerIdentityStore(str(tmp_path / "identity.sqlite"))
+    cred = issue_service_credential(
+        ident, principal_id="prn_bk", display_name="bookkeeping", org_id=ORG,
+        audience=audience, now=now, expires_at=now + 3600)
+    grant_event_type_use(ident, principal_id="prn_bk",
+                         event_type="bookkeeping.voucher.posted", granted_by="prn_owner", now=now)
+    identity_app = build_identity_app(store=ident, key_manager=km, issuer=issuer, now_fn=time.time)
+
+    store = ServerLedgerStore(f"sqlite:///{tmp_path}/bus.sqlite")
+    reg = SchemaRegistry()
+    reg.register("voucher/v1", {"type": "object", "required": ["voucherId"],
+                                "properties": {"voucherId": {"type": "string"}},
+                                "additionalProperties": False})
+    counter = {"n": 0}
+    counter_lock = threading.Lock()
+    deliv = InProcessDelivery()
+
+    def handler(event):
+        with counter_lock:
+            counter["n"] += 1
+
+    deliv.register("counter", handler)
+    dispatcher = Dispatcher(store, deliv, now_fn=time.time)
+    service = BusService(store, reg, dispatcher, now_fn=time.time,
+                         now_iso_fn=lambda: datetime.now(timezone.utc).isoformat(),
+                         grants_for=lambda pid: collect_grants(principal_id=pid, identity_store=ident))
+
+    jwks_provider = cached_jwks_provider(f"{identity_url}/.well-known/jwks.json")
+    require_principal = make_require_principal(
+        jwks_provider=jwks_provider, audience=audience, now_fn=time.time, issuer=issuer)
+    bus_app = build_bus_app(service, require_principal=require_principal)
+
+    return ServedBusStack(identity_url, bus_url, cred, audience, store, counter,
+                          ThreadedServer(identity_app, id_sock), ThreadedServer(bus_app, bus_sock))
