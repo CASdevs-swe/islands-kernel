@@ -6,6 +6,8 @@ kernel-keys/
 *.local.json
 .env
 .env.*
+# the deploy env TEMPLATE carries no secrets and is tracked on purpose
+!deploy/.env.template
 vault-store/
 *.sqlite
 *.sqlite3

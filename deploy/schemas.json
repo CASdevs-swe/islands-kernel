@@ -1,0 +1,10 @@
+{
+  "voucher/v1": {
+    "type": "object",
+    "required": ["voucherId"],
+    "properties": {
+      "voucherId": { "type": "string" }
+    },
+    "additionalProperties": false
+  }
+}
