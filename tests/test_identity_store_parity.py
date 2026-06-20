@@ -111,3 +111,21 @@ def test_access_token_json_round_trip_and_rotate():
         rotated = s.get_access_token("at_h2")
         assert rotated is not None
         assert rotated.refresh == {"hash": "rh2", "expires_at": 19999.0}
+
+
+def _access_token(h, rh):
+    return OAuthAccessToken(
+        hash=h, client_id="client_1", principal_id="prn_1", org_id="org_1",
+        audience="aud_1", scope="openid", expires_at=9999.0,
+        refresh={"hash": rh, "expires_at": 9999.0})
+
+
+def test_access_token_hashes_parity_after_put_and_rotate():
+    # access_token_hashes() backs the O(n) refresh scan; both backends must
+    # enumerate the same live hashes after the same put/rotate sequence.
+    for s in _stores():
+        s.put_access_token(_access_token("at_a", "rh_a"))
+        s.put_access_token(_access_token("at_b", "rh_b"))
+        assert set(s.access_token_hashes()) == {"at_a", "at_b"}
+        s.rotate_refresh("at_a", _access_token("at_c", "rh_c"))
+        assert set(s.access_token_hashes()) == {"at_b", "at_c"}
