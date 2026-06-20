@@ -30,6 +30,5 @@ def test_http_push_posts_envelope_and_audience_header():
 
 
 def test_http_push_raises_on_non_2xx():
-    HttpPushDelivery(http_post=lambda url, json, headers: _FakeResp(500))
     with pytest.raises(Exception):
         HttpPushDelivery(http_post=lambda url, json, headers: _FakeResp(500)).deliver(_sub(), _ev())

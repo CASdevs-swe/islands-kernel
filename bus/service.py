@@ -3,7 +3,7 @@ from typing import Callable
 
 from identity.authorize import authorize
 from identity.model import GrantTarget
-from bus.model import Event, Subscription, Delivery, EventContract, EnvelopeError
+from bus.model import Subscription, Delivery, EventContract
 from bus.envelope import stamp_envelope, validate_envelope
 from bus.schema_registry import SchemaRegistry
 from bus.store.base import LedgerStore

@@ -17,7 +17,7 @@ def stamp_envelope(body: dict, *, principal: str, org: str, now_iso: str) -> Eve
         principal=principal,           # server-stamped
         occurred_at=body.get("occurredAt") or now_iso,
         trace=body.get("trace") if isinstance(body.get("trace"), dict) else {},
-        data=body.get("data") if isinstance(body.get("data"), dict) else body.get("data"),
+        data=body.get("data"),
     )
 
 

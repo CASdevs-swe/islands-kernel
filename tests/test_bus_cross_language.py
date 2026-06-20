@@ -9,6 +9,20 @@ import pytest
 from tests.served_harness import build_served_bus_stack
 
 
+def _readline_with_timeout(stream, timeout=15.0):
+    result = {}
+
+    def run():
+        result["line"] = stream.readline()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError("node consumer produced no output within timeout")
+    return result.get("line", "")
+
+
 def _tmpdir():
     import tempfile, pathlib
     return pathlib.Path(tempfile.mkdtemp())
@@ -53,7 +67,7 @@ def test_python_publishes_node_consumes():
     consumer = subprocess.Popen(["node", os.path.join(os.path.dirname(__file__), "node_bus_consumer.mjs")],
                                 stdout=subprocess.PIPE, text=True)
     try:
-        consumer_port = int(consumer.stdout.readline().strip())   # the script prints its port first
+        consumer_port = int(_readline_with_timeout(consumer.stdout).strip())   # the script prints its port first
         jwt = _exchange(stack.identity_url, stack.cred, stack.audience)
         h = {"Authorization": f"Bearer {jwt}"}
         httpx.post(f"{stack.bus_url}/subscriptions", headers=h,
@@ -65,7 +79,7 @@ def test_python_publishes_node_consumes():
                          "source": "bookkeeping", "trace": {"store": "bk", "ref": "r1"},
                          "data": {"voucherId": "V-7"}, "id": "evt_x"}).raise_for_status()
         # the node consumer prints the received envelope's voucherId on the next line
-        line = consumer.stdout.readline().strip()
+        line = _readline_with_timeout(consumer.stdout).strip()
         assert line == "V-7"
     finally:
         consumer.terminate()

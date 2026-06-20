@@ -21,5 +21,6 @@ class SchemaRegistry:
         try:
             jsonschema.validate(instance=data, schema=schema)
         except jsonschema.ValidationError as exc:
-            # message-only; never echo the offending data into a stored record
-            raise EnvelopeError(f"data does not match {schema_id}: {exc.message}") from None
+            # path-only; never echo the offending value back to the caller
+            path = "/".join(str(p) for p in exc.absolute_path) or "<root>"
+            raise EnvelopeError(f"data does not match {schema_id} at {path}") from None
