@@ -12,6 +12,9 @@ reference in the owning island's store.
 
 - `BUS_BOOT=1`
 - `BUS_AUDIENCE` — the bus's public URL (the JWT `aud`)
+- A principal that also talks to the vault exchanges ONE token whose `aud` is the
+  list of target service audiences (e.g. `["vault","bus"]`). See
+  `docs/kernel-integration.md`.
 - `BUS_DB` — SQLAlchemy-style sqlite URL (default `sqlite:///vault-store/bus.sqlite`, gitignored)
 - `KERNEL_JWKS_URL` — `<identity-url>/.well-known/jwks.json`
 - `KERNEL_ISSUER` — same issuer as identity

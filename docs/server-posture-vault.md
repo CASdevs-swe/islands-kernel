@@ -19,6 +19,9 @@ Vault (brokers Fortnox tokens, single writer):
 - `VAULT_KEK` — base64 32-byte KEK. Crown jewel. Required when served (`VAULT_BACKEND=server` or `VAULT_REQUIRE_KERNEL=1`); no random fallback. Host secret store / KMS only.
 - `KERNEL_JWKS_URL` — `<identity-url>/.well-known/jwks.json`
 - `VAULT_AUDIENCE` — the vault's public URL (the JWT `aud`)
+- A principal that also talks to the bus exchanges ONE token whose `aud` is the
+  list of target service audiences (e.g. `["vault","bus"]`); the credential is
+  issued unbound. See `docs/kernel-integration.md` for the combined model.
 - `KERNEL_ISSUER` — same issuer as identity
 - `KERNEL_IDENTITY_DB` — the identity sqlite (default `vault-store/identity.sqlite`, for grant lookups)
 - `uvicorn vault.app:app --host 127.0.0.1 --port <vault-port>`
