@@ -163,6 +163,7 @@ class ServedBusStack:
     cred: str
     audience: str
     store: ServerLedgerStore
+    identity_store: ServerIdentityStore
     counter: dict
     _identity_srv: ThreadedServer
     _bus_srv: ThreadedServer
@@ -220,5 +221,5 @@ def build_served_bus_stack(tmp_path) -> ServedBusStack:
         jwks_provider=jwks_provider, audience=audience, now_fn=time.time, issuer=issuer)
     bus_app = build_bus_app(service, require_principal=require_principal)
 
-    return ServedBusStack(identity_url, bus_url, cred, audience, store, counter,
+    return ServedBusStack(identity_url, bus_url, cred, audience, store, ident, counter,
                           ThreadedServer(identity_app, id_sock), ThreadedServer(bus_app, bus_sock))
