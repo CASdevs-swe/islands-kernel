@@ -79,7 +79,12 @@ After a connection exists in the vault, issue one principal that can reach both
 services and capture the printed credential into the host secret store:
 
     python -m scripts.kernel_provision --principal prn_bk --org <org> \
-      --connection <connection-id> --event-type bookkeeping.voucher.posted
+      --connection <connection-id> --event-type bookkeeping.voucher.posted \
+      --granted-by <operator-principal-id> --ttl-days 90
+
+`--granted-by` records which operator issued the credential (audit trail).
+The credential expires after `--ttl-days` (default 90); rotate it before then,
+or pass `--expires-at <epoch>` for an explicit cutoff.
 
 ## Proof
 
