@@ -90,3 +90,36 @@ class Dispatcher:
             ))
         finally:
             self._store.release_lease(lease_key, holder)
+
+
+from dataclasses import asdict
+
+
+def envelope_json(event: Event) -> dict:
+    """Wire form of the envelope (camelCase the producer-facing field)."""
+    d = asdict(event)
+    d["occurredAt"] = d.pop("occurred_at")
+    return d
+
+
+class HttpPushDelivery:
+    """Hosted-posture delivery: POST the envelope to the subscriber endpoint."""
+
+    def __init__(self, http_post: Optional[Callable[[str, dict, dict], object]] = None) -> None:
+        self._post = http_post
+
+    def _poster(self):
+        if self._post is not None:
+            return self._post
+        import httpx
+        def post(url, json, headers):
+            return httpx.post(url, json=json, headers=headers, timeout=10.0)
+        return post
+
+    def deliver(self, sub: Subscription, event: Event) -> None:
+        url = sub.target["url"]
+        headers = {"X-Event-Audience": sub.target.get("audience", "")}
+        resp = self._poster()(url, envelope_json(event), headers)
+        status = getattr(resp, "status_code", 0)
+        if not (200 <= status < 300):
+            raise RuntimeError(f"push failed: HTTP {status}")
