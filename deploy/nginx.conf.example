@@ -1,0 +1,114 @@
+# islands-kernel reverse proxy — nginx translation of deploy/Caddyfile.
+#
+# Why nginx and not Caddy: the deploy target is the existing MCP VPS, which
+# already terminates TLS for mcp.smartcharge.nu under its own nginx. Standing up
+# Caddy there would fight for :443 and knock the live MCP offline. So we EXTEND
+# the box's existing nginx with three server blocks instead. (Caddy stays the
+# turnkey option only if the kernel ever gets a dedicated box.)
+#
+# Drop these blocks into the box's nginx (e.g. a new file under
+# /etc/nginx/sites-available/ symlinked into sites-enabled/, or an include).
+#
+# BEFORE APPLYING, the operator confirms the box's ACTUAL layout:
+#   - where the existing site files live and how they are included
+#     (sites-available/sites-enabled vs conf.d);
+#   - the real TLS cert + key paths and how mcp.smartcharge.nu is wired
+#     (certbot/letsencrypt live dir, a custom path, etc.) — the ssl_certificate
+#     lines below are PLACEHOLDERS to be replaced with the box's real certs for
+#     id./vault./bus.caputventi.com;
+#   - that ports 8081/8082/8083 are free on loopback and match the env file.
+# Then `nginx -t` and reload — never restart blind on a box serving live MCP.
+#
+# Route/header parity with the Caddyfile:
+#   - identity: /.well-known/* (the JWKS) is the only world-readable endpoint;
+#     all other routes (/auth/exchange, /oauth/*) carry their credential in the
+#     request body, so they proxy through but are not "open".
+#   - vault, bus: every route requires a kernel JWT (verified in-app against the
+#     JWKS). Here we ALSO reject any request without an Authorization header at
+#     the edge, so the unauthenticated surface is zero.
+#   - Caddy's `header -Server` (strip the Server header) maps to
+#     `server_tokens off;` for the version, plus `more_clear_headers Server;` if
+#     the headers-more module is available on the box (commented below).
+
+# ── identity ──────────────────────────────────────────────────────────────────
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name id.caputventi.com;
+
+    # PLACEHOLDER — replace with the box's real cert/key for this subdomain.
+    ssl_certificate     /etc/letsencrypt/live/id.caputventi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/id.caputventi.com/privkey.pem;
+
+    server_tokens off;
+    # more_clear_headers Server;   # full parity with Caddy's `header -Server`
+                                   # (needs the headers-more-nginx module)
+
+    # The JWKS is the public trust anchor: world-readable by design.
+    location /.well-known/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Token exchange + OAuth endpoints: credential travels in the body.
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ── vault ───────────────────────────────────────────────────────────────────
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name vault.caputventi.com;
+
+    # PLACEHOLDER — replace with the box's real cert/key for this subdomain.
+    ssl_certificate     /etc/letsencrypt/live/vault.caputventi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/vault.caputventi.com/privkey.pem;
+
+    server_tokens off;
+    # more_clear_headers Server;
+
+    # Reject any request without an Authorization header at the edge (Caddy's
+    # `@noauth not header Authorization *` -> `respond @noauth 401`).
+    if ($http_authorization = "") {
+        return 401;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8082;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ── bus ───────────────────────────────────────────────────────────────────────
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name bus.caputventi.com;
+
+    # PLACEHOLDER — replace with the box's real cert/key for this subdomain.
+    ssl_certificate     /etc/letsencrypt/live/bus.caputventi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bus.caputventi.com/privkey.pem;
+
+    server_tokens off;
+    # more_clear_headers Server;
+
+    if ($http_authorization = "") {
+        return 401;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8083;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
