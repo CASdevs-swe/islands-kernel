@@ -21,7 +21,7 @@ def _covers(
         grant_target.kind == "org"
         and request_org is not None
         and grant_target.id == request_org
-        and target.kind in ("island", "capability", "connection")
+        and target.kind in ("island", "capability", "connection", "event-type")
     ):
         return True
     return False

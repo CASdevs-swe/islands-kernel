@@ -4,7 +4,7 @@ from typing import Literal, Optional
 PrincipalType = Literal["human", "service"]
 Role = Literal["owner", "admin", "member", "viewer"]
 Access = Literal["use", "manage"]
-TargetKind = Literal["org", "island", "capability", "connection"]
+TargetKind = Literal["org", "island", "capability", "connection", "event-type"]
 IdentityKind = Literal["passkey", "google", "password"]
 
 
