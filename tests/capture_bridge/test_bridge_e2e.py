@@ -41,6 +41,8 @@ def test_inbound_event_routes_through_to_a_contained_plan(tmp_path):
     register_inbound_schema(reg)
     clock = itertools.count(1000.0, 1.0)
     disp = Dispatcher(store, delivery, now_fn=lambda: next(clock))
+    # grants_for is principal-agnostic by design in this embedded harness.
+    # Authorizing the real connector:telegram service principal is deferred to the served-bus cutover.
     svc = BusService(store, reg, disp, now_fn=lambda: 1000.0,
                      now_iso_fn=lambda: "2025-06-15T12:26:40Z",
                      grants_for=lambda pid: _grants())

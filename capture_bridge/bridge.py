@@ -40,7 +40,7 @@ def make_handler(deps: BridgeDeps):
         ident = deps.principal_map.resolve(sender)
         if ident is None:
             return {"principal": None, "org": None, "type": None, "plan": [],
-                    "skipped": True, "reason": "unresolved sender"}
+                    "skipped": True, "reason": f"unresolved sender: {sender}"}
         text = data.get("text", "")
         ctype = classify(
             text, deps.allowed_types, deps.claude_bin,

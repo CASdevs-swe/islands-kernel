@@ -54,6 +54,8 @@ def run(fixture_path: str, vault_path: str, *, classify_type: str = "personal-ta
     disp = Dispatcher(store, delivery, now_fn=lambda: next(clock))
     svc = BusService(store, reg, disp, now_fn=lambda: 1000.0,
                      now_iso_fn=lambda: "2025-06-15T12:26:40Z",
+                     # grants_for is principal-agnostic by design in this embedded harness.
+                     # Authorizing the real connector:telegram service principal is deferred to the served-bus cutover.
                      grants_for=lambda pid: [
                          Grant("g", "prn_sam", GrantTarget("event-type", INBOUND_EVENT_TYPE),
                                "use", None, "org_caput", 0.0, None),

@@ -9,6 +9,8 @@ principal on its own; only an explicit map entry grants identity.
 class PrincipalMap:
     def __init__(self, entries: list[dict]) -> None:
         # key on (channel, channelUserId)
+        # Intentional asymmetry: construction fails fast on a malformed entry (bare dict access),
+        # while resolve() soft-fails to None on an unknown sender.
         self._by_key = {
             (e["channel"], e["channelUserId"]): {"principal": e["principal"], "org": e["org"]}
             for e in entries
