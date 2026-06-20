@@ -1,13 +1,14 @@
 import pytest
 from bus.model import Event, Subscription, Delivery, EventContract
 from bus.store.memory import InMemoryLedgerStore
+from bus.store.server import ServerLedgerStore
 
 
 def _stores(tmp_path):
-    return [InMemoryLedgerStore()]  # SQLite store appended in Task 5
+    return [InMemoryLedgerStore(), ServerLedgerStore(f"sqlite:///{tmp_path}/ledger.sqlite")]
 
 
-@pytest.fixture(params=[0])
+@pytest.fixture(params=[0, 1])
 def store(request, tmp_path):
     return _stores(tmp_path)[request.param]
 
