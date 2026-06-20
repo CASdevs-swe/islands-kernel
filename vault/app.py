@@ -33,7 +33,8 @@ def build_app(service: AccessService, *, require_principal: Optional[Callable] =
         def access_token_authed(conn_id: str, claims=Depends(require_principal)):
             principal = claims["sub"]
             org = claims.get("org")
-            island = claims.get("aud", "unknown")
+            island_aud = claims.get("aud", "unknown")
+            island = island_aud if isinstance(island_aud, str) else (island_aud[0] if island_aud else "unknown")
 
             def grant_check(conn):
                 if authorizer is not None:
