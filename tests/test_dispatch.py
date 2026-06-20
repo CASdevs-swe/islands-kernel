@@ -1,7 +1,7 @@
 import itertools
 from bus.model import Event, Subscription, Delivery
 from bus.store.memory import InMemoryLedgerStore
-from bus.dispatch import Dispatcher, InProcessDelivery, BackoffPolicy
+from bus.dispatch import Dispatcher, InProcessDelivery, BackoffPolicy, RoutingDelivery
 
 
 def _ev(eid="evt_1"):
@@ -75,3 +75,30 @@ def test_backoff_is_capped_exponential():
     assert p.next_at(1, now=100.0) == 100.0 + 1.0
     assert p.next_at(2, now=100.0) == 100.0 + 2.0
     assert p.next_at(7, now=100.0) == 100.0 + 60.0     # 2**6 = 64 capped to 60
+
+
+def test_routing_delivery_dispatches_by_kind():
+    """RoutingDelivery picks http delivery for kind='http', inprocess otherwise."""
+    calls = {"in": [], "http": []}
+
+    class FakeInProcess:
+        def deliver(self, sub, event):
+            calls["in"].append(sub.target.get("kind"))
+
+    class FakeHttp:
+        def deliver(self, sub, event):
+            calls["http"].append(sub.target.get("kind"))
+
+    routing = RoutingDelivery(FakeInProcess(), FakeHttp())
+
+    ev = _ev()
+    sub_in = Subscription("sub_a", "org_1", "smartcharge", "bookkeeping.voucher.posted",
+                          {"kind": "inprocess", "key": "counter"}, "g1")
+    sub_http = Subscription("sub_b", "org_1", "node-island", "bookkeeping.voucher.posted",
+                            {"kind": "http", "url": "http://127.0.0.1:9999/events", "audience": "node-island"}, "g2")
+
+    routing.deliver(sub_in, ev)
+    routing.deliver(sub_http, ev)
+
+    assert calls["in"] == ["inprocess"]
+    assert calls["http"] == ["http"]

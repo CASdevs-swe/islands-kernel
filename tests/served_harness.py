@@ -150,7 +150,7 @@ from identity.deps import make_require_principal
 from identity.authorize import collect_grants
 from bus.store.server import ServerLedgerStore
 from bus.schema_registry import SchemaRegistry
-from bus.dispatch import Dispatcher, InProcessDelivery
+from bus.dispatch import Dispatcher, InProcessDelivery, HttpPushDelivery, RoutingDelivery
 from bus.service import BusService
 from bus.app import build_bus_app
 from bus.provisioning import grant_event_type_use
@@ -211,7 +211,7 @@ def build_served_bus_stack(tmp_path) -> ServedBusStack:
             counter["n"] += 1
 
     deliv.register("counter", handler)
-    dispatcher = Dispatcher(store, deliv, now_fn=time.time)
+    dispatcher = Dispatcher(store, RoutingDelivery(deliv, HttpPushDelivery()), now_fn=time.time)
     service = BusService(store, reg, dispatcher, now_fn=time.time,
                          now_iso_fn=lambda: datetime.now(timezone.utc).isoformat(),
                          grants_for=lambda pid: collect_grants(principal_id=pid, identity_store=ident))

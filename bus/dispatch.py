@@ -123,3 +123,16 @@ class HttpPushDelivery:
         status = getattr(resp, "status_code", 0)
         if not (200 <= status < 300):
             raise RuntimeError(f"push failed: HTTP {status}")
+
+
+class RoutingDelivery:
+    """Pick the delivery strategy by target.kind ('inprocess' | 'http')."""
+
+    def __init__(self, inprocess, http) -> None:
+        self._in = inprocess
+        self._http = http
+
+    def deliver(self, sub: Subscription, event: Event) -> None:
+        if sub.target.get("kind") == "http":
+            return self._http.deliver(sub, event)
+        return self._in.deliver(sub, event)
