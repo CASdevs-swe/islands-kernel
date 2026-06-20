@@ -1,0 +1,45 @@
+# Caddy reverse proxy + automatic TLS for the served kernel.
+# Three subdomains, each proxying to a loopback-bound service. Values come from
+# the environment (Caddy's {$VAR} substitution) so nothing is hardcoded; export
+# the deploy env file before `caddy run --config deploy/Caddyfile`.
+#
+# Posture:
+#   - identity: the public JWKS document is the only world-readable endpoint.
+#     /auth/exchange and /oauth/* are reachable but carry their own credential in
+#     the request body (an opaque token / PKCE code), so they are not "open".
+#   - vault, bus: every route requires a kernel JWT. The app verifies the JWT
+#     against identity's JWKS; here we additionally reject any request without an
+#     Authorization header at the edge, so the unauthenticated surface is zero.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# ── identity ────────────────────────────────────────────────────────────────
+{$KERNEL_ID_DOMAIN} {
+	# The JWKS is the public trust anchor: world-readable by design.
+	handle /.well-known/* {
+		reverse_proxy {$BIND_HOST}:{$IDENTITY_PORT}
+	}
+	# Token exchange + OAuth endpoints: credential travels in the body.
+	handle {
+		reverse_proxy {$BIND_HOST}:{$IDENTITY_PORT}
+	}
+	header -Server
+}
+
+# ── vault ───────────────────────────────────────────────────────────────────
+{$KERNEL_VAULT_DOMAIN} {
+	@noauth not header Authorization *
+	respond @noauth 401
+	reverse_proxy {$BIND_HOST}:{$VAULT_PORT}
+	header -Server
+}
+
+# ── bus ─────────────────────────────────────────────────────────────────────
+{$KERNEL_BUS_DOMAIN} {
+	@noauth not header Authorization *
+	respond @noauth 401
+	reverse_proxy {$BIND_HOST}:{$BUS_PORT}
+	header -Server
+}
