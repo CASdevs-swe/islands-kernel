@@ -36,6 +36,7 @@ The bus has no own secret; it reuses the served identity store for grant lookups
 | `VAULT_AUDIENCE` | — | required | — | this vault's `aud` |
 | `BUS_AUDIENCE` | — | — | required | this bus's `aud` |
 | `BUS_DB` | — | — | required | SQLAlchemy sqlite URL |
+| `BUS_SCHEMAS_FILE` | — | — | optional | JSON file (schema_id -> JSON Schema) seeding the event-data registry; unset = no schemas registered, so every publish is rejected at validation |
 
 `KERNEL_ISSUER`, `KERNEL_JWKS_URL`, and `KERNEL_IDENTITY_DB` use identical names
 across all three services (verified by `tests/test_env_matrix_boot.py`).

@@ -68,3 +68,37 @@ def test_bus_requires_audience(monkeypatch):
     monkeypatch.delenv("BUS_AUDIENCE", raising=False)
     with pytest.raises(KeyError, match="BUS_AUDIENCE"):
         _build_bus_app_from_env()
+
+
+def test_bus_schema_registry_empty_when_unset(monkeypatch):
+    from bus.app import _load_schema_registry_from_env
+    from bus.model import EnvelopeError
+
+    monkeypatch.delenv("BUS_SCHEMAS_FILE", raising=False)
+    reg = _load_schema_registry_from_env()
+    # unset -> no schemas registered (the prior served-boot behaviour)
+    with pytest.raises(EnvelopeError, match="unknown data schema"):
+        reg.validate_data("voucher/v1", {"voucherId": "V-1"})
+
+
+def test_bus_schema_registry_loads_file(monkeypatch, tmp_path):
+    import json
+    from bus.app import _load_schema_registry_from_env
+
+    schemas = {"voucher/v1": {"type": "object", "required": ["voucherId"],
+                              "properties": {"voucherId": {"type": "string"}},
+                              "additionalProperties": False}}
+    f = tmp_path / "schemas.json"
+    f.write_text(json.dumps(schemas))
+    monkeypatch.setenv("BUS_SCHEMAS_FILE", str(f))
+    reg = _load_schema_registry_from_env()
+    reg.validate_data("voucher/v1", {"voucherId": "V-1"})  # registered -> no raise
+
+
+def test_bus_schema_registry_rejects_non_object(monkeypatch, tmp_path):
+    f = tmp_path / "schemas.json"
+    f.write_text("[1, 2, 3]")
+    monkeypatch.setenv("BUS_SCHEMAS_FILE", str(f))
+    with pytest.raises(RuntimeError, match="must be a JSON object"):
+        from bus.app import _load_schema_registry_from_env
+        _load_schema_registry_from_env()

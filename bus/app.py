@@ -73,6 +73,30 @@ def build_bus_app(service: BusService, *, require_principal) -> FastAPI:
     return app
 
 
+def _load_schema_registry_from_env() -> "SchemaRegistry":
+    """Build the event-data schema registry for the served bus.
+
+    The served bus validates every event's `data` against the schema named by its
+    envelope. With no schemas registered the bus rejects every publish, so a real
+    deploy seeds the registry from a JSON file pointed at by `BUS_SCHEMAS_FILE`
+    (an object mapping schema id -> JSON Schema). The var is optional: unset keeps
+    the empty registry (the prior behaviour) so nothing already wired changes.
+    """
+    import json
+    from bus.schema_registry import SchemaRegistry
+
+    reg = SchemaRegistry()
+    path = os.environ.get("BUS_SCHEMAS_FILE")
+    if path:
+        with open(path, encoding="utf-8") as fh:
+            schemas = json.load(fh)
+        if not isinstance(schemas, dict):
+            raise RuntimeError(f"BUS_SCHEMAS_FILE {path!r} must be a JSON object of schema_id -> schema")
+        for schema_id, json_schema in schemas.items():
+            reg.register(schema_id, json_schema)
+    return reg
+
+
 def _build_bus_app_from_env() -> FastAPI:
     import time
     from datetime import datetime, timezone
@@ -81,7 +105,6 @@ def _build_bus_app_from_env() -> FastAPI:
     from identity.store.server import ServerIdentityStore
     from identity.authorize import collect_grants
     from bus.store.server import ServerLedgerStore
-    from bus.schema_registry import SchemaRegistry
     from bus.dispatch import Dispatcher, HttpPushDelivery
     from vault.kernel_auth import cached_jwks_provider
 
@@ -96,7 +119,7 @@ def _build_bus_app_from_env() -> FastAPI:
     dispatcher = Dispatcher(store, HttpPushDelivery(), now_fn=time.time)
     service = BusService(
         store,
-        SchemaRegistry(),
+        _load_schema_registry_from_env(),
         dispatcher,
         now_fn=time.time,
         now_iso_fn=lambda: datetime.now(timezone.utc).isoformat(),
