@@ -18,6 +18,7 @@ Always work on the current branch. Never create a new branch.
 
 ```
 vault/       — core package
+bus/         — inter-island event bus + registry (slice 5)
 tests/       — pytest suite
 docs/        — plan and design documents
 ```
