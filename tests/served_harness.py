@@ -223,3 +223,107 @@ def build_served_bus_stack(tmp_path) -> ServedBusStack:
 
     return ServedBusStack(identity_url, bus_url, cred, audience, store, ident, counter,
                           ThreadedServer(identity_app, id_sock), ThreadedServer(bus_app, bus_sock))
+
+
+OTHER_ORG = "magic-studios"
+OTHER_ORG_ACCESS_PATH = "/connections/magic-studios%2Ffortnox%2F000000-0000/access-token"
+
+
+@dataclass
+class ServedKernelStack:
+    identity_url: str
+    vault_url: str
+    bus_url: str
+    cred: str
+    seen: dict
+    identity_store: ServerIdentityStore
+    _identity_srv: ThreadedServer
+    _vault_srv: ThreadedServer
+    _bus_srv: ThreadedServer
+
+    def start(self):
+        self._identity_srv.start()
+        self._vault_srv.start()
+        self._bus_srv.start()
+
+    def stop(self):
+        self._bus_srv.stop()
+        self._vault_srv.stop()
+        self._identity_srv.stop()
+
+
+def build_served_kernel_stack(tmp_path) -> ServedKernelStack:
+    import time
+
+    id_sock, id_port = bound_socket()
+    vault_sock, vault_port = bound_socket()
+    bus_sock, bus_port = bound_socket()
+    identity_url = f"http://127.0.0.1:{id_port}"
+    vault_url = f"http://127.0.0.1:{vault_port}"
+    bus_url = f"http://127.0.0.1:{bus_port}"
+    issuer = identity_url
+    jwks_url = f"{identity_url}/.well-known/jwks.json"
+    now = time.time()
+
+    # ONE signing key, ONE identity store, ONE unbound service principal with both grants.
+    km = KeyManager.generate("kid-kernel")
+    ident = ServerIdentityStore(str(tmp_path / "identity.sqlite"))
+    cred = issue_service_credential(
+        ident, principal_id="prn_bk", display_name="bookkeeping", org_id=ORG,
+        audience=None, now=now, expires_at=now + 3600)
+    grant_connection_use(ident, principal_id="prn_bk", connection_id="conn_1",
+                         granted_by="prn_owner", now=now)
+    grant_event_type_use(ident, principal_id="prn_bk",
+                         event_type="bookkeeping.voucher.posted", granted_by="prn_owner", now=now)
+    identity_app = build_identity_app(store=ident, key_manager=km, issuer=issuer, now_fn=time.time)
+
+    # vault wired to the shared identity (audience "vault")
+    wrapper = SecretboxKeyWrapper(nacl.utils.random(32))
+    vstore = ServerStore(f"sqlite:///{tmp_path}/vault.sqlite", wrapper)
+    vstore.put_connection(Connection(
+        id="conn_1", org=ORG, provider="fortnox", account=ACCOUNT, scopes=["bookkeeping"],
+        app_cred_ref="fortnox", token=Token("FORTNOX_ACCESS", "REFRESH", now + 99999.0, "bookkeeping"),
+        rotation="rotating", lease=None, created_by="prn_owner", created_at=0.0, updated_at=0.0))
+    vstore.put_connection(Connection(
+        id="conn_2", org=OTHER_ORG, provider="fortnox", account="000000-0000", scopes=["bookkeeping"],
+        app_cred_ref="fortnox", token=Token("OTHER_ACCESS", "OTHER_REFRESH", now + 99999.0, "bookkeeping"),
+        rotation="rotating", lease=None, created_by="prn_owner", created_at=0.0, updated_at=0.0))
+    vcfg = VaultConfig(now_fn=time.time, http_post=lambda *a: {},
+                       app_creds={"fortnox": AppCred("cid", "secret")}, state_hmac_key=b"k", skew=60)
+    vservice = AccessService(vstore, {"fortnox": CountingProvider()}, vcfg)
+    v_require, v_authorizer = make_kernel_auth(
+        jwks_provider=cached_jwks_provider(jwks_url), audience="vault", issuer=issuer,
+        now_fn=time.time, identity_store=ident, vault_store=vservice.store)
+    v_manage = make_manage_authorizer(now_fn=time.time, identity_store=ident, vault_store=vservice.store)
+    vault_app = build_app(vservice, require_principal=v_require, authorizer=v_authorizer,
+                          manage_authorizer=v_manage)
+
+    # bus wired to the same shared identity (audience "bus")
+    bstore = ServerLedgerStore(f"sqlite:///{tmp_path}/bus.sqlite")
+    reg = SchemaRegistry()
+    reg.register("voucher/v1", {"type": "object", "required": ["voucherId"],
+                                "properties": {"voucherId": {"type": "string"}},
+                                "additionalProperties": False})
+    seen = {"n": 0, "org": None}
+    seen_lock = threading.Lock()
+    deliv = InProcessDelivery()
+
+    def handler(event):
+        with seen_lock:
+            seen["n"] += 1
+            seen["org"] = event.org
+
+    deliv.register("counter", handler)
+    dispatcher = Dispatcher(bstore, RoutingDelivery(deliv, HttpPushDelivery()), now_fn=time.time)
+    bservice = BusService(bstore, reg, dispatcher, now_fn=time.time,
+                          now_iso_fn=lambda: datetime.now(timezone.utc).isoformat(),
+                          grants_for=lambda pid: collect_grants(principal_id=pid, identity_store=ident))
+    b_require = make_require_principal(
+        jwks_provider=cached_jwks_provider(jwks_url), audience="bus", now_fn=time.time, issuer=issuer)
+    bus_app = build_bus_app(bservice, require_principal=b_require)
+
+    return ServedKernelStack(
+        identity_url, vault_url, bus_url, cred, seen, ident,
+        ThreadedServer(identity_app, id_sock),
+        ThreadedServer(vault_app, vault_sock),
+        ThreadedServer(bus_app, bus_sock))
