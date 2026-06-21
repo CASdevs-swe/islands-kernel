@@ -2,6 +2,15 @@
 
 This document covers the local-loopback soak: the identity service, the bus bridge, and provisioning the Telegram connector to publish messages to the soak observation vault.
 
+## Prerequisites
+
+- `cloud-hub` must be checked out as a **sibling** of `islands-kernel`. The bridge resolves `SOAK_ROUTE_MJS` to `../cloud-hub/skills/capture-route/scripts/route.mjs`; if that file is absent, the bridge boot fails.
+- Before starting, export the real vault path so the isolation guard is armed:
+  ```bash
+  export SOAK_REAL_VAULT=<absolute path to the live vault root>
+  ```
+  Without this, `real_vault` is `None` and `assert_observation_isolated` is a no-op — writes to the wrong path won't be blocked.
+
 ## Generate the signing seed
 
 Generate a 32-byte hex string for `KERNEL_SIGNING_SEED`:
@@ -40,12 +49,13 @@ This prints a credential string. Save it—you will use it to configure the conn
 
 ## Export the principal map
 
-The principal map is a JSON array that maps Telegram user IDs to their soak principal identity and organization. Create a shell variable:
+The principal map is a JSON array that maps channel users to their soak principal identity and organization. The bridge looks up entries by `channel` + `channelUserId`. Create a shell variable:
 
 ```bash
 export SOAK_PRINCIPAL_MAP='[
   {
-    "telegram_user_id": <real Telegram user ID from TELEGRAM_ALLOWED_USER_IDS>,
+    "channel": "telegram",
+    "channelUserId": <real Telegram user ID from TELEGRAM_ALLOWED_USER_IDS>,
     "principal": "<principal from provisioning output>",
     "org": "org_caput"
   }

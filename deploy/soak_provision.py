@@ -32,7 +32,7 @@ def soak_provision(store, *, principal_id: str, org_id: str, now: float,
     return cred
 
 
-def main(argv) -> None:
+def main(argv: list[str]) -> None:
     p = argparse.ArgumentParser(description="Provision the soak connector principal")
     p.add_argument("--principal", default="connector:telegram")
     p.add_argument("--org", required=True)

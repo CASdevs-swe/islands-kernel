@@ -37,6 +37,7 @@ module.exports = {
         SOAK_LOG: path.join(REPO, "soak.log"),
         SOAK_ROUTE_MJS: path.join(REPO, "..", "cloud-hub", "skills", "capture-route", "scripts", "route.mjs"),
         // SOAK_PRINCIPAL_MAP supplied from the shell env (JSON, contains the real Telegram id).
+        // SOAK_REAL_VAULT optionally supplied from the shell env to arm the isolation guard (assert_observation_isolated).
       },
     },
   ],

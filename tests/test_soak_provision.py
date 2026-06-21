@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 
 from identity.store.server import ServerIdentityStore
 from identity.authorize import collect_grants
