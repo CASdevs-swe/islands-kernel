@@ -81,6 +81,22 @@ class IdentityBinding:
 
 
 @dataclass
+class IslandRegistry:
+    id: str
+    name: str
+    issuer: str                 # expected `iss` of the island's assertion JWT
+    jwks_uri: str               # where to fetch the island's assertion-verification JWKS
+    audience: str               # the MCP resource string that maps an OAuth request to this island
+    sso_authorize_url: str      # where the kernel redirects the user-agent to log in
+    sso_token_url: str          # server-to-server: exchange the island sso_code for an assertion
+    sso_client_secret_hash: str # hash of the secret the kernel presents to the island /sso/token
+    org_id: str                 # kernel Org this island's users belong to
+    session_ttl_days: float     # sizes the refresh token for this island
+    created_at: float
+    disabled_at: Optional[float] = None
+
+
+@dataclass
 class OAuthClient:
     id: str
     name: str

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
 )
 
 
@@ -64,3 +64,14 @@ class IdentityStore(ABC):
     def append_log(self, entry: AccessLog) -> None: ...
     @abstractmethod
     def read_log(self, principal_id: str) -> list[AccessLog]: ...
+
+    @abstractmethod
+    def put_island(self, i: IslandRegistry) -> None: ...
+    @abstractmethod
+    def get_island(self, island_id: str) -> Optional[IslandRegistry]: ...
+    @abstractmethod
+    def get_island_by_audience(self, audience: str) -> Optional[IslandRegistry]: ...
+    @abstractmethod
+    def list_islands(self) -> list[IslandRegistry]: ...
+    @abstractmethod
+    def disable_island(self, island_id: str, at: float) -> None: ...

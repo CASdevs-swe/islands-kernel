@@ -1,9 +1,10 @@
 import threading
+from dataclasses import replace
 from typing import Optional
 from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
 )
 
 
@@ -19,6 +20,7 @@ class InMemoryIdentityStore(IdentityStore):
         self._codes: dict[str, OAuthAuthCode] = {}
         self._at: dict[str, OAuthAccessToken] = {}
         self._logs: list[AccessLog] = []
+        self._islands: dict[str, IslandRegistry] = {}
 
     def put_principal(self, p):
         with self._mu: self._principals[p.id] = p
@@ -87,3 +89,18 @@ class InMemoryIdentityStore(IdentityStore):
         with self._mu: self._logs.append(entry)
     def read_log(self, principal_id):
         return [e for e in self._logs if e.principal_id == principal_id]
+
+    def put_island(self, i):
+        with self._mu:
+            self._islands[i.id] = i
+    def get_island(self, island_id):
+        return self._islands.get(island_id)
+    def get_island_by_audience(self, audience):
+        return next((i for i in self._islands.values() if i.audience == audience), None)
+    def list_islands(self):
+        return list(self._islands.values())
+    def disable_island(self, island_id, at):
+        with self._mu:
+            cur = self._islands.get(island_id)
+            if cur is not None:
+                self._islands[island_id] = replace(cur, disabled_at=at)

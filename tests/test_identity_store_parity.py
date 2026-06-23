@@ -129,3 +129,24 @@ def test_access_token_hashes_parity_after_put_and_rotate():
         assert set(s.access_token_hashes()) == {"at_a", "at_b"}
         s.rotate_refresh("at_a", _access_token("at_c", "rh_c"))
         assert set(s.access_token_hashes()) == {"at_b", "at_c"}
+
+
+def test_island_registry_round_trip_and_lookup_by_audience():
+    from identity.model import IslandRegistry
+    for s in _stores():
+        i = IslandRegistry(
+            id="unnest", name="unnest", issuer="https://app.unnest.se",
+            jwks_uri="https://app.unnest.se/.well-known/jwks.json",
+            audience="https://mcp.unnest.se/mcp",
+            sso_authorize_url="https://app.unnest.se/sso/authorize",
+            sso_token_url="https://app.unnest.se/sso/token",
+            sso_client_secret_hash="deadbeef",
+            org_id="org_unnest", session_ttl_days=30.0, created_at=1000.0,
+        )
+        s.put_island(i)
+        assert s.get_island("unnest") == i
+        assert s.get_island_by_audience("https://mcp.unnest.se/mcp") == i
+        assert s.get_island_by_audience("https://other") is None
+        assert [x.id for x in s.list_islands()] == ["unnest"]
+        s.disable_island("unnest", 2000.0)
+        assert s.get_island("unnest").disabled_at == 2000.0

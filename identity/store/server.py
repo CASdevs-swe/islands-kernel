@@ -5,7 +5,7 @@ from typing import Optional
 from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, GrantTarget, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
 )
 
 _SCHEMA = """
@@ -32,6 +32,11 @@ CREATE TABLE IF NOT EXISTS access_tokens(
   audience TEXT, scope TEXT, expires_at REAL, refresh_json TEXT);
 CREATE TABLE IF NOT EXISTS logs(
   principal_id TEXT, org_id TEXT, island TEXT, capability TEXT, at REAL);
+CREATE TABLE IF NOT EXISTS islands(
+  id TEXT PRIMARY KEY, name TEXT, issuer TEXT, jwks_uri TEXT, audience TEXT,
+  sso_authorize_url TEXT, sso_token_url TEXT, sso_client_secret_hash TEXT,
+  org_id TEXT, session_ttl_days REAL, created_at REAL, disabled_at REAL
+);
 """
 
 
@@ -230,3 +235,34 @@ class ServerIdentityStore(IdentityStore):
             rows = self._db.execute("SELECT * FROM logs WHERE principal_id=?",
                                     (principal_id,)).fetchall()
         return [AccessLog(*r) for r in rows]
+
+    # --- islands ---
+    def put_island(self, i):
+        with self._mu:
+            self._db.execute(
+                "INSERT OR REPLACE INTO islands VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (i.id, i.name, i.issuer, i.jwks_uri, i.audience, i.sso_authorize_url,
+                 i.sso_token_url, i.sso_client_secret_hash, i.org_id, i.session_ttl_days,
+                 i.created_at, i.disabled_at))
+            self._db.commit()
+
+    def _row_to_island(self, r):
+        return IslandRegistry(id=r[0], name=r[1], issuer=r[2], jwks_uri=r[3], audience=r[4],
+            sso_authorize_url=r[5], sso_token_url=r[6], sso_client_secret_hash=r[7],
+            org_id=r[8], session_ttl_days=r[9], created_at=r[10], disabled_at=r[11])
+
+    def get_island(self, island_id):
+        r = self._db.execute("SELECT * FROM islands WHERE id=?", (island_id,)).fetchone()
+        return self._row_to_island(r) if r else None
+
+    def get_island_by_audience(self, audience):
+        r = self._db.execute("SELECT * FROM islands WHERE audience=?", (audience,)).fetchone()
+        return self._row_to_island(r) if r else None
+
+    def list_islands(self):
+        return [self._row_to_island(r) for r in self._db.execute("SELECT * FROM islands").fetchall()]
+
+    def disable_island(self, island_id, at):
+        with self._mu:
+            self._db.execute("UPDATE islands SET disabled_at=? WHERE id=?", (at, island_id))
+            self._db.commit()
