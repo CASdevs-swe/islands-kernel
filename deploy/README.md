@@ -1,7 +1,10 @@
 # Served-kernel deploy
 
 Automation for running the three kernel services — identity, vault, bus — on a
-host behind Caddy. Authoritative env contract: `docs/kernel-integration.md`
+host behind the box's existing nginx (the deploy target already serves
+mcp.smartcharge.nu; do NOT introduce Caddy — see `nginx.conf.example`). The
+`Caddyfile` is kept only as the proxy reference to translate. Authoritative env
+contract: `docs/kernel-integration.md`
 (env matrix + combined boot) and `docs/server-posture-vault.md` (secret custody
 + gated cutover). This directory is the turnkey wrapper around those docs.
 
@@ -38,7 +41,10 @@ chmod 0600 /etc/islands-kernel/kernel.env
 export KERNEL_ENV_FILE=/etc/islands-kernel/kernel.env
 export KERNEL_REPO_DIR=/opt/islands-kernel
 deploy/deploy.sh                       # up to the STOP banner
-caddy run --config deploy/Caddyfile    # (or `caddy reload`) with the env exported
+# Reverse proxy is the box's EXISTING nginx — do NOT run Caddy here (it would
+# fight :443 and drop the live MCP). Add the three server blocks from
+# deploy/nginx.conf.example (swap PLACEHOLDER certs for the box's real ones), then:
+nginx -t && nginx -s reload
 ```
 
 `deploy.sh` stops before any live-money step. Issuing a real Fortnox connection

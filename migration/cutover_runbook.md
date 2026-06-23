@@ -9,13 +9,21 @@ token: read it exactly once, import it once, never let two processes refresh it.
 
 ## Order of operations
 
-1. Pause writes. Stop the bookkeeping launchd agents and any research routine
-   that posts to Fortnox. Confirm nothing will call Fortnox during the window
-   (no due-runner, no overnight research, no manual session).
+1. Pause writes. Stop the launchd agents that can call Fortnox:
+   `com.caputventi.morning-snapshot`, `com.caputventi.run-due`,
+   `com.caputventi.calendar-to-time-entries`, and `com.caputventi.always-research`
+   (`launchctl bootout` / `unload`). Confirm nothing will call Fortnox during the
+   window (no due-runner, no overnight research, no manual session).
 
-2. Read the currently-valid token exactly once from the canonical live file,
-   `bookkeeping-engine/.fortnox/tokens.local.json`, capturing `access_token`,
+2. Read the currently-valid token exactly once from the freshest on-disk token
+   file. NOTE: `bookkeeping-engine/.fortnox/tokens.local.json` no longer exists —
+   the live link is the most-recently-rotated file, currently
+   `research-engine/bokforing/fortnox/tokens.local.json` (Jun 4); the May-10
+   `bookkeeping-engine/bokforing/fortnox/tokens.age` is the superseded, dead link.
+   Re-check mtimes at window time and use the newest. Capture `access_token`,
    `refresh_token`, `expires_at`, `scope`. Do NOT trigger a refresh while reading.
+   If the imported token's refresh fails in step 6, it was the wrong/dead link —
+   no rotation happened, so abort and retry the import with the other candidate.
    Immediately copy every live token file verbatim to a timestamped on-disk
    backup OUTSIDE any repo (e.g. `~/.fortnox-cutover-backup/<ts>/`, mode 0600):
    bookkeeping `.fortnox/tokens.local.json`, `bokforing/fortnox/tokens.age`, and

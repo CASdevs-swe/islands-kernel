@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Served-kernel deploy — brings up identity + vault + bus under pm2 behind Caddy.
+# Served-kernel deploy — brings up identity + vault + bus under pm2 behind the
+# box's existing nginx (no Caddy; see deploy/nginx.conf.example).
 # Idempotent: safe to re-run. It STOPS before any live-money / live-Fortnox step;
 # the connect flow and the gated cutover (docs/server-posture-vault.md) are run
 # by a human, separately.
@@ -106,17 +107,20 @@ cat <<'STOP'
 
 === STOP — automated deploy complete ===
 
-The served kernel is up under pm2 behind Caddy. The next steps are LIVE-MONEY
-actions and are NOT automated. Run them with a human present, following
-docs/server-posture-vault.md "Gated live cutover":
+The served kernel is up under pm2 behind the box's nginx. The next steps are
+LIVE-MONEY actions and are NOT automated. The cutover is a MIGRATION of the
+existing Fortnox token, NOT a re-authorization — re-auth revokes the live refresh
+chain and there is no back-out. Run with a human present, following
+migration/cutover_runbook.md (authoritative) + docs/server-posture-vault.md:
 
   1. Issue a real service credential and grant `use` on the real Fortnox
-     connection through the served connect flow. No prod flag flip yet.
-  2. Point bookkeeping-engine at the served vault and prove a real Fortnox
-     fetch on -> off -> on.
-  3. Re-authorize Fortnox through the served connect flow, back up first, then
-     flip research-engine + the snapshot routine. The first refresh rotates and
-     invalidates the on-disk token — the irreversible commit point.
+     connection. No prod flag flip yet.
+  2. Pause writes, read the EXISTING token once, seal it into the vault, and
+     prove a live read-only GET 200 BEFORE deleting anything.
+  3. Point bookkeeping-engine at the served vault and prove a real Fortnox
+     fetch on -> off -> on; then flip research-engine + the snapshot routine.
+     The vault's first refresh rotates the imported token — the one-way commit.
+     The step-2 on-disk backup is the only rollback.
 
 Do not proceed past this banner from a script.
 STOP

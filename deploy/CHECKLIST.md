@@ -10,10 +10,9 @@ extend the box's existing nginx — no Caddy. Process manager: pm2. Secrets: a
 
 Reversible build/boot first; the live cutover stays gated to the end.
 
-## 0. Push (precondition, gated on OK)
-- [ ] Push islands-kernel. The 7 deploy-automation commits (`89e4488..3f99517`)
-      are unpushed; the host cannot run `deploy/` it does not have. Held until
-      the go-ahead.
+## 0. Push (precondition) — SATISFIED
+- [x] islands-kernel is on `origin/main`, tree clean (the deploy-automation
+      commits are already pushed). The host can `git pull` and run `deploy/`.
 
 ## 1. Host prereqs
 - [ ] Python + uv present; pm2 present (already there for the MCP).
@@ -52,11 +51,15 @@ Reversible build/boot first; the live cutover stays gated to the end.
       (`aud=[vault,bus]`) → fetch a vault token AND publish+consume a bus event
       (the `kernel-integration.md` proof against the deployed URLs).
 
-## 7. Gated live cutover — STOP, Sam present
-- [ ] Do NOT proceed past here without the Task-10 stop-and-confirm gates.
-      Re-authorize Fortnox through the deployed served connect flow, repoint
-      bookkeeping at the served vault over HTTPS, prove on→off→on, accept the
-      irreversible first-remote-refresh. Follow the Task-10 prompt; do not improvise.
+## 7. Gated live cutover — STOP, Sam present. MIGRATE, do NOT re-auth.
+- [ ] This is a MIGRATION of the existing Fortnox token, NOT a re-authorization.
+      Re-auth revokes the live refresh chain (the Fortnox single-chain finding) —
+      one revoked chain and there is no back-out. Do NOT run the served connect
+      flow. Follow `migration/cutover_runbook.md` step-for-step: pause writes,
+      read the existing token once, seal it into the vault, prove a live read-only
+      GET 200 BEFORE deleting anything, repoint bookkeeping (then research +
+      snapshot routine) at the served vault over HTTPS. The vault's first refresh
+      is the one-way commit; the step-2 backup is the only rollback.
 
 ## Rollback
 - [ ] Stop the three pm2 services. Bookkeeping falls back to its in-process LOCAL

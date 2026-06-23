@@ -68,9 +68,15 @@ Each step is a live-money action. Stop and confirm before each.
    in-process local path stays the fallback the whole time.
    **STOP.**
 
-3. Remote: re-authorize Fortnox THROUGH the served connect flow (assume the May-10
-   `tokens.age` is dead — confirm, do not import). Back it up first. Then flip
-   research-engine's `RESEARCH_USE_VAULT` + the remote snapshot routine onto the served
-   vault. The first refresh rotates + invalidates the on-disk token — the irreversible
-   commit point. Show diffs and get explicit OK before it.
+3. Remote: MIGRATE the existing Fortnox token into the served vault — do NOT
+   re-authorize. Re-auth revokes the live refresh chain (the single-chain finding)
+   and there is no back-out. The live token is the freshest on-disk file (today
+   `research-engine/bokforing/fortnox/tokens.local.json`, Jun 4; the May-10
+   `tokens.age` is the superseded, dead link). Back up every token file first
+   (the backup is the only rollback), read the live token once without triggering
+   a refresh, seal it into the vault, and prove a live read-only GET 200 BEFORE
+   deleting anything. Then flip research-engine's `RESEARCH_USE_VAULT` + the remote
+   snapshot routine onto the served vault. The vault's first refresh rotates the
+   imported token — the irreversible commit point. See `migration/cutover_runbook.md`
+   for the ordered procedure. Show diffs and get explicit OK before it.
    **STOP.**
