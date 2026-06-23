@@ -51,3 +51,29 @@ def test_signature_from_unknown_key_is_rejected():
     with pytest.raises(IslandAssertionError):
         verify_island_assertion(tok, jwks=real.jwks_document(), expected_iss=ISS,
                                 expected_aud=AUD, expected_nonce="n1", now=1000)
+
+
+def test_algorithm_confusion_hs256_is_rejected():
+    km = KeyManager.generate("island-1")
+    claims = {"iss": ISS, "sub": "42", "aud": AUD, "nonce": "n1", "exp": 2000}
+    tok = pyjwt.encode(claims, "secret", algorithm="HS256", headers={"kid": km.kid})
+    with pytest.raises(IslandAssertionError):
+        verify_island_assertion(tok, jwks=km.jwks_document(), expected_iss=ISS,
+                                expected_aud=AUD, expected_nonce="n1", now=1000)
+
+
+def test_audience_mismatch_is_rejected():
+    km = KeyManager.generate("island-1")
+    tok = _assert(km, aud="https://wrong.audience.example")
+    with pytest.raises(IslandAssertionError):
+        verify_island_assertion(tok, jwks=km.jwks_document(), expected_iss=ISS,
+                                expected_aud=AUD, expected_nonce="n1", now=1000)
+
+
+def test_missing_kid_in_header_is_rejected():
+    km = KeyManager.generate("island-1")
+    claims = {"iss": ISS, "sub": "42", "aud": AUD, "nonce": "n1", "exp": 2000}
+    tok = pyjwt.encode(claims, km.private_pem(), algorithm="EdDSA", headers={})
+    with pytest.raises(IslandAssertionError):
+        verify_island_assertion(tok, jwks=km.jwks_document(), expected_iss=ISS,
+                                expected_aud=AUD, expected_nonce="n1", now=1000)

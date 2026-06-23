@@ -72,3 +72,20 @@ def test_refresh_ttl_defaults_to_30_days_when_no_island():
     redeem_code(s, code=code, code_verifier=verifier, audience="https://mcp.x", now=1001)
     row = s.get_access_token(next(iter(s.access_token_hashes())))
     assert row.refresh["expires_at"] == 1001 + 30 * 86400
+
+
+def test_refresh_window_slides_to_new_now():
+    from identity.tokens import hash_token
+    s, code, verifier = _setup()  # audience="https://mcp.x"
+    _island(s, "https://mcp.x", days=7.0)
+    now1 = 1001
+    issued = redeem_code(s, code=code, code_verifier=verifier, audience="https://mcp.x", now=now1)
+    now2 = now1 + 3600  # one hour later
+    rotated = refresh(s, refresh_token=issued["refresh_token"], now=now2)
+    new_rt_hash = hash_token(rotated["refresh_token"])
+    new_at_hash = next(
+        h for h in s.access_token_hashes()
+        if s.get_access_token(h).refresh.get("hash") == new_rt_hash
+    )
+    new_row = s.get_access_token(new_at_hash)
+    assert new_row.refresh["expires_at"] == now2 + 7 * 86400

@@ -1,4 +1,3 @@
-import time
 from identity.store.memory import InMemoryIdentityStore
 from identity.model import IslandRegistry, Org
 from identity.federation.principals import find_or_create_island_principal

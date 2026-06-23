@@ -46,10 +46,16 @@ def complete_federation(store, *, txn_id, sso_code, now, island_fetch, island_jw
     island = store.get_island(txn.island_id)
     if island is None or island.disabled_at is not None:
         raise FederationError("island unavailable")
-    assertion = island_fetch(island, sso_code)
+    try:
+        assertion = island_fetch(island, sso_code)
+        jwks = island_jwks_fetch(island)
+    except FederationError:
+        raise
+    except Exception:
+        raise FederationError("island token exchange failed")
     try:
         # the assertion's audience is the kernel issuer; passed in explicitly by the route layer
-        identity = verify_island_assertion(assertion, jwks=island_jwks_fetch(island),
+        identity = verify_island_assertion(assertion, jwks=jwks,
             expected_iss=island.issuer, expected_aud=kernel_issuer,
             expected_nonce=txn.nonce, now=now)
     except IslandAssertionError as e:

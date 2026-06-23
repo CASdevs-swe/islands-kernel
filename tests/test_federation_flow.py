@@ -69,6 +69,24 @@ def test_unknown_audience_is_rejected():
             client_state="x", return_uri=RETURN, now=1000)
 
 
+def test_island_fetch_transport_error_becomes_federation_error():
+    island_km = KeyManager.generate("island-1")
+    s = _store(island_km)
+    redirect = start_federation(s, client_id="cli_1", redirect_uri="https://claude.ai/cb",
+        code_challenge=make_challenge("v" * 64), audience=AUD, scope="mcp",
+        client_state="STATE", return_uri=RETURN, now=1000)
+    txn_id = dict(up.parse_qsl(up.urlsplit(redirect).query))["txn"]
+
+    def bad_fetch(island, sso_code):
+        raise RuntimeError("island 503")
+
+    with pytest.raises(FederationError):
+        complete_federation(s, txn_id=txn_id, sso_code="c", now=1100,
+            island_fetch=bad_fetch,
+            island_jwks_fetch=lambda island: island_km.jwks_document(),
+            kernel_issuer=KERNEL_ISS)
+
+
 def test_replayed_txn_is_rejected():
     island_km = KeyManager.generate("island-1")
     s = _store(island_km)
