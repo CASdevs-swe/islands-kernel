@@ -37,3 +37,19 @@ def verify_island_assertion(token: str, *, jwks: dict, expected_iss: str, expect
         raise IslandAssertionError("nonce mismatch")
     return {"island_user_id": claims["sub"], "email": claims.get("email"),
             "workspace": claims.get("workspace")}
+
+
+def verify_island_assertion_symmetric(token: str, *, secret: str, expected_iss: str,
+                                      expected_aud: str, expected_nonce: str, now: float) -> dict:
+    try:
+        claims = pyjwt.decode(token, secret, algorithms=["HS256"], audience=expected_aud,
+                              issuer=expected_iss,
+                              options={"verify_exp": False, "require": ["exp", "sub", "aud", "iss"]})
+    except pyjwt.PyJWTError as e:
+        raise IslandAssertionError(f"assertion verification failed: {e}")
+    if now >= claims["exp"]:
+        raise IslandAssertionError("assertion expired")
+    if claims.get("nonce") != expected_nonce:
+        raise IslandAssertionError("nonce mismatch")
+    return {"island_user_id": claims["sub"], "email": claims.get("email"),
+            "workspace": claims.get("workspace")}
