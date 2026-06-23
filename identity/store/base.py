@@ -3,6 +3,7 @@ from typing import Optional
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
     OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
+    FederationTxn,
 )
 
 
@@ -82,3 +83,10 @@ class IdentityStore(ABC):
     def get_principal_by_island(self, island_id: str, island_user_id: str) -> Optional[str]: ...
     @abstractmethod
     def get_island_link_by_principal(self, principal_id: str) -> Optional[IslandPrincipalLink]: ...
+
+    @abstractmethod
+    def put_federation_txn(self, t: FederationTxn) -> None: ...
+    @abstractmethod
+    def get_federation_txn(self, txn_hash: str) -> Optional[FederationTxn]: ...
+    @abstractmethod
+    def consume_federation_txn(self, txn_hash: str, at: float) -> bool: ...

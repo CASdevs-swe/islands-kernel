@@ -5,6 +5,7 @@ from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
     OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
+    FederationTxn,
 )
 
 
@@ -22,6 +23,7 @@ class InMemoryIdentityStore(IdentityStore):
         self._logs: list[AccessLog] = []
         self._islands: dict[str, IslandRegistry] = {}
         self._island_links: dict[tuple[str, str], IslandPrincipalLink] = {}
+        self._ftxn: dict[str, FederationTxn] = {}
 
     def put_principal(self, p):
         with self._mu: self._principals[p.id] = p
@@ -114,3 +116,16 @@ class InMemoryIdentityStore(IdentityStore):
         return link.principal_id if link else None
     def get_island_link_by_principal(self, principal_id):
         return next((l for l in self._island_links.values() if l.principal_id == principal_id), None)
+
+    def put_federation_txn(self, t):
+        with self._mu:
+            self._ftxn[t.hash] = t
+    def get_federation_txn(self, txn_hash):
+        return self._ftxn.get(txn_hash)
+    def consume_federation_txn(self, txn_hash, at):
+        with self._mu:
+            t = self._ftxn.get(txn_hash)
+            if t is None or t.consumed_at is not None:
+                return False
+            self._ftxn[txn_hash] = replace(t, consumed_at=at)
+            return True

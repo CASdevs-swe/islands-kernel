@@ -6,6 +6,7 @@ from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, GrantTarget, McpToken, OAuthClient,
     OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
+    FederationTxn,
 )
 
 _SCHEMA = """
@@ -40,6 +41,11 @@ CREATE TABLE IF NOT EXISTS islands(
 CREATE TABLE IF NOT EXISTS island_principal_links(
   island_id TEXT, island_user_id TEXT, principal_id TEXT, created_at REAL,
   PRIMARY KEY(island_id, island_user_id)
+);
+CREATE TABLE IF NOT EXISTS federation_txns(
+  hash TEXT PRIMARY KEY, client_id TEXT, redirect_uri TEXT, code_challenge TEXT,
+  audience TEXT, scope TEXT, client_state TEXT, island_id TEXT, nonce TEXT,
+  expires_at REAL, consumed_at REAL
 );
 """
 
@@ -290,3 +296,28 @@ class ServerIdentityStore(IdentityStore):
             (principal_id,)).fetchone()
         return IslandPrincipalLink(island_id=r[0], island_user_id=r[1],
                                    principal_id=r[2], created_at=r[3]) if r else None
+
+    # --- federation txns ---
+    def put_federation_txn(self, t):
+        with self._mu:
+            self._db.execute("INSERT OR REPLACE INTO federation_txns VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (t.hash, t.client_id, t.redirect_uri, t.code_challenge, t.audience, t.scope,
+                 t.client_state, t.island_id, t.nonce, t.expires_at, t.consumed_at))
+            self._db.commit()
+
+    def get_federation_txn(self, txn_hash):
+        r = self._db.execute("SELECT * FROM federation_txns WHERE hash=?", (txn_hash,)).fetchone()
+        if not r:
+            return None
+        return FederationTxn(hash=r[0], client_id=r[1], redirect_uri=r[2], code_challenge=r[3],
+            audience=r[4], scope=r[5], client_state=r[6], island_id=r[7], nonce=r[8],
+            expires_at=r[9], consumed_at=r[10])
+
+    def consume_federation_txn(self, txn_hash, at):
+        with self._mu:
+            r = self._db.execute("SELECT consumed_at FROM federation_txns WHERE hash=?", (txn_hash,)).fetchone()
+            if r is None or r[0] is not None:
+                return False
+            self._db.execute("UPDATE federation_txns SET consumed_at=? WHERE hash=?", (at, txn_hash))
+            self._db.commit()
+            return True

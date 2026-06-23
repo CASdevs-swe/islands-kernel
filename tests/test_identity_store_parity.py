@@ -161,3 +161,15 @@ def test_island_principal_link_round_trip_both_directions():
         assert s.get_principal_by_island("unnest", "42") == "prn_a"
         assert s.get_principal_by_island("unnest", "99") is None
         assert s.get_island_link_by_principal("prn_a") == link
+
+
+def test_federation_txn_round_trip_and_single_use():
+    from identity.model import FederationTxn
+    for s in _stores():
+        t = FederationTxn(hash="th1", client_id="cli", redirect_uri="https://claude.ai/cb",
+            code_challenge="chal", audience="https://mcp.unnest.se/mcp", scope="mcp",
+            client_state="st", island_id="unnest", nonce="n1", expires_at=2000.0)
+        s.put_federation_txn(t)
+        assert s.get_federation_txn("th1") == t
+        assert s.consume_federation_txn("th1", 1500.0) is True
+        assert s.consume_federation_txn("th1", 1600.0) is False

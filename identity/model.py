@@ -127,6 +127,21 @@ class OAuthAuthCode:
 
 
 @dataclass
+class FederationTxn:
+    hash: str
+    client_id: str
+    redirect_uri: str
+    code_challenge: str
+    audience: str
+    scope: str
+    client_state: str
+    island_id: str
+    nonce: str
+    expires_at: float
+    consumed_at: Optional[float] = None
+
+
+@dataclass
 class OAuthAccessToken:
     hash: str
     client_id: str
