@@ -12,6 +12,8 @@ from identity.tokens import hash_token
 def provision_island(store, *, island_id, name, issuer, jwks_uri, audience, sso_authorize_url,
                      sso_token_url, sso_client_secret, org_id, org_name, session_ttl_days, now,
                      assertion_secret=None) -> None:
+    if assertion_secret is not None and len(assertion_secret) < 32:
+        raise ValueError("assertion_secret must be at least 32 characters")
     if store.get_org(org_id) is None:
         store.put_org(Org(id=org_id, name=org_name, created_at=now))
     store.put_island(IslandRegistry(id=island_id, name=name, issuer=issuer, jwks_uri=jwks_uri,

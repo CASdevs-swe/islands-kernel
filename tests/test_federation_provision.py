@@ -31,10 +31,23 @@ def test_main_prints_island_id_once(tmp_path, monkeypatch, capsys):
 
 def test_provision_island_stores_assertion_secret(tmp_path):
     store = ServerIdentityStore(str(tmp_path / "identity.sqlite"))
+    secret = "shared-xyz-exactly-32-chars-pad00"
     provision_island(store, island_id="unnest", name="unnest", issuer="https://app.unnest.se",
         jwks_uri="https://app.unnest.se/jwks", audience="https://mcp.unnest.se/mcp",
         sso_authorize_url="https://app.unnest.se/sso/authorize",
         sso_token_url="https://app.unnest.se/sso/token", sso_client_secret="s3cr3t",
         org_id="org_unnest", org_name="unnest", session_ttl_days=30.0, now=time.time(),
-        assertion_secret="shared-xyz")
-    assert store.get_island_by_audience("https://mcp.unnest.se/mcp").assertion_secret == "shared-xyz"
+        assertion_secret=secret)
+    assert store.get_island_by_audience("https://mcp.unnest.se/mcp").assertion_secret == secret
+
+
+def test_provision_island_rejects_short_assertion_secret(tmp_path):
+    import pytest
+    store = ServerIdentityStore(str(tmp_path / "identity.sqlite"))
+    with pytest.raises(ValueError):
+        provision_island(store, island_id="unnest", name="unnest", issuer="https://app.unnest.se",
+            jwks_uri="https://app.unnest.se/jwks", audience="https://mcp.unnest.se/mcp",
+            sso_authorize_url="https://app.unnest.se/sso/authorize",
+            sso_token_url="https://app.unnest.se/sso/token", sso_client_secret="s3cr3t",
+            org_id="org_unnest", org_name="unnest", session_ttl_days=30.0, now=time.time(),
+            assertion_secret="short")
