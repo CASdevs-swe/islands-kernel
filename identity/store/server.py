@@ -5,7 +5,7 @@ from typing import Optional
 from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, GrantTarget, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
 )
 
 _SCHEMA = """
@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS islands(
   id TEXT PRIMARY KEY, name TEXT, issuer TEXT, jwks_uri TEXT, audience TEXT,
   sso_authorize_url TEXT, sso_token_url TEXT, sso_client_secret_hash TEXT,
   org_id TEXT, session_ttl_days REAL, created_at REAL, disabled_at REAL
+);
+CREATE TABLE IF NOT EXISTS island_principal_links(
+  island_id TEXT, island_user_id TEXT, principal_id TEXT, created_at REAL,
+  PRIMARY KEY(island_id, island_user_id)
 );
 """
 
@@ -266,3 +270,23 @@ class ServerIdentityStore(IdentityStore):
         with self._mu:
             self._db.execute("UPDATE islands SET disabled_at=? WHERE id=?", (at, island_id))
             self._db.commit()
+
+    # --- island principal links ---
+    def put_island_principal_link(self, link):
+        with self._mu:
+            self._db.execute("INSERT OR REPLACE INTO island_principal_links VALUES (?,?,?,?)",
+                (link.island_id, link.island_user_id, link.principal_id, link.created_at))
+            self._db.commit()
+
+    def get_principal_by_island(self, island_id, island_user_id):
+        r = self._db.execute(
+            "SELECT principal_id FROM island_principal_links WHERE island_id=? AND island_user_id=?",
+            (island_id, island_user_id)).fetchone()
+        return r[0] if r else None
+
+    def get_island_link_by_principal(self, principal_id):
+        r = self._db.execute(
+            "SELECT * FROM island_principal_links WHERE principal_id=?",
+            (principal_id,)).fetchone()
+        return IslandPrincipalLink(island_id=r[0], island_user_id=r[1],
+                                   principal_id=r[2], created_at=r[3]) if r else None

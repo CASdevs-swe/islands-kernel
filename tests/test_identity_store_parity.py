@@ -150,3 +150,14 @@ def test_island_registry_round_trip_and_lookup_by_audience():
         assert [x.id for x in s.list_islands()] == ["unnest"]
         s.disable_island("unnest", 2000.0)
         assert s.get_island("unnest").disabled_at == 2000.0
+
+
+def test_island_principal_link_round_trip_both_directions():
+    from identity.model import IslandPrincipalLink
+    for s in _stores():
+        link = IslandPrincipalLink(island_id="unnest", island_user_id="42",
+                                   principal_id="prn_a", created_at=1000.0)
+        s.put_island_principal_link(link)
+        assert s.get_principal_by_island("unnest", "42") == "prn_a"
+        assert s.get_principal_by_island("unnest", "99") is None
+        assert s.get_island_link_by_principal("prn_a") == link

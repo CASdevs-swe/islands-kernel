@@ -97,6 +97,14 @@ class IslandRegistry:
 
 
 @dataclass
+class IslandPrincipalLink:
+    island_id: str
+    island_user_id: str
+    principal_id: str
+    created_at: float
+
+
+@dataclass
 class OAuthClient:
     id: str
     name: str

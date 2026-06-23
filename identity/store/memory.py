@@ -4,7 +4,7 @@ from typing import Optional
 from identity.store.base import IdentityStore
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
 )
 
 
@@ -21,6 +21,7 @@ class InMemoryIdentityStore(IdentityStore):
         self._at: dict[str, OAuthAccessToken] = {}
         self._logs: list[AccessLog] = []
         self._islands: dict[str, IslandRegistry] = {}
+        self._island_links: dict[tuple[str, str], IslandPrincipalLink] = {}
 
     def put_principal(self, p):
         with self._mu: self._principals[p.id] = p
@@ -104,3 +105,12 @@ class InMemoryIdentityStore(IdentityStore):
             cur = self._islands.get(island_id)
             if cur is not None:
                 self._islands[island_id] = replace(cur, disabled_at=at)
+
+    def put_island_principal_link(self, link):
+        with self._mu:
+            self._island_links[(link.island_id, link.island_user_id)] = link
+    def get_principal_by_island(self, island_id, island_user_id):
+        link = self._island_links.get((island_id, island_user_id))
+        return link.principal_id if link else None
+    def get_island_link_by_principal(self, principal_id):
+        return next((l for l in self._island_links.values() if l.principal_id == principal_id), None)

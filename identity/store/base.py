@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from identity.model import (
     Principal, Org, Membership, Grant, McpToken, OAuthClient,
-    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry,
+    OAuthAuthCode, OAuthAccessToken, AccessLog, IslandRegistry, IslandPrincipalLink,
 )
 
 
@@ -75,3 +75,10 @@ class IdentityStore(ABC):
     def list_islands(self) -> list[IslandRegistry]: ...
     @abstractmethod
     def disable_island(self, island_id: str, at: float) -> None: ...
+
+    @abstractmethod
+    def put_island_principal_link(self, link: IslandPrincipalLink) -> None: ...
+    @abstractmethod
+    def get_principal_by_island(self, island_id: str, island_user_id: str) -> Optional[str]: ...
+    @abstractmethod
+    def get_island_link_by_principal(self, principal_id: str) -> Optional[IslandPrincipalLink]: ...
