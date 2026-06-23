@@ -56,7 +56,9 @@ def test_signature_from_unknown_key_is_rejected():
 def test_algorithm_confusion_hs256_is_rejected():
     km = KeyManager.generate("island-1")
     claims = {"iss": ISS, "sub": "42", "aud": AUD, "nonce": "n1", "exp": 2000}
-    tok = pyjwt.encode(claims, "secret", algorithm="HS256", headers={"kid": km.kid})
+    # >=32-byte secret so HS256 encode emits no InsecureKeyLengthWarning; the test
+    # proves the algorithm (not the key) is rejected.
+    tok = pyjwt.encode(claims, "x" * 32, algorithm="HS256", headers={"kid": km.kid})
     with pytest.raises(IslandAssertionError):
         verify_island_assertion(tok, jwks=km.jwks_document(), expected_iss=ISS,
                                 expected_aud=AUD, expected_nonce="n1", now=1000)
