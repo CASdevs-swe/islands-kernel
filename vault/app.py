@@ -70,6 +70,25 @@ def build_app(service: AccessService, *, require_principal: Optional[Callable] =
             return guard(lambda: service.finish_connect(
                 body["code"], body["state"], body.get("code_verifier")))
 
+        @app.post("/connections/{conn_id:path}/import")
+        async def import_authed(conn_id: str, request: Request, claims=Depends(require_principal)):
+            body = await request.json()
+            key = _parse_id(conn_id)
+
+            def do_import():
+                # close the cross-org seed hole: a kernel JWT may only import into its
+                # own org (mirrors the authorize() request_org binding to conn.org).
+                if key.org != claims.get("org"):
+                    raise PermissionError(
+                        f"{claims['sub']} cannot import into org {key.org}")
+                return service.import_connection(
+                    key, access_token=body["accessToken"], refresh_token=body["refreshToken"],
+                    expires_at=body["expiresAt"], scope=body["scope"], principal_id=claims["sub"],
+                    rotation=body.get("rotation"), scopes=body.get("scopes"),
+                    app_cred_ref=body.get("appCredRef"))
+
+            return guard(do_import)
+
         @app.post("/connections/{conn_id:path}/grant")
         async def grant_authed(conn_id: str, request: Request, claims=Depends(require_principal)):
             body = await request.json()
@@ -104,6 +123,16 @@ def build_app(service: AccessService, *, require_principal: Optional[Callable] =
         def access_token_stub(conn_id: str, x_principal: str = Header("stub"),
                               x_island: str = Header("unknown")):
             return guard(lambda: service.get_access_token(_parse_id(conn_id), x_principal, x_island))
+
+        @app.post("/connections/{conn_id:path}/import")
+        async def import_stub(conn_id: str, request: Request, x_principal: str = Header("stub")):
+            body = await request.json()
+            return guard(lambda: service.import_connection(
+                _parse_id(conn_id), access_token=body["accessToken"],
+                refresh_token=body["refreshToken"], expires_at=body["expiresAt"],
+                scope=body["scope"], principal_id=x_principal,
+                rotation=body.get("rotation"), scopes=body.get("scopes"),
+                app_cred_ref=body.get("appCredRef")))
 
         @app.post("/connections/{conn_id:path}/grant")
         async def grant(conn_id: str, request: Request, x_principal: str = Header("stub")):
