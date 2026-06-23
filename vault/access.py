@@ -1,5 +1,5 @@
 from __future__ import annotations
-from vault.model import ConnKey, ConnectionAccessLog, ConnectionGrant, Connection, new_id
+from vault.model import ConnKey, ConnectionAccessLog, ConnectionGrant, Connection, Token, new_id
 from vault.store.base import Store
 from vault.providers.base import Provider
 from vault.refresh import refresh_if_needed
@@ -87,6 +87,26 @@ class AccessService:
         state = sign_state({"org": org, "provider": provider, "account": account,
                             "principal": principal_id}, self.config.state_hmac_key)
         return {"authorizeUrl": prov.authorize_url(app, state, code_challenge), "state": state}
+
+    def import_connection(self, key: ConnKey, *, access_token, refresh_token, expires_at,
+                          scope, principal_id, rotation=None, scopes=None, app_cred_ref=None):
+        """Seal an existing token into the store without any OAuth exchange or refresh.
+
+        Mirrors finish_connect's Connection assembly but takes the token material directly.
+        No provider network call, no refresh_if_needed; put_connection seals with the
+        store KEK. A re-import of the same key overwrites in place with fresh timestamps."""
+        prov = self.providers[key.provider]
+        now = self.config.now_fn()
+        token = Token(access_token, refresh_token, float(expires_at), scope)
+        conn = Connection(
+            id=new_id("conn", key.as_str()), org=key.org, provider=key.provider,
+            account=key.account,
+            scopes=scopes if scopes is not None else (scope.split() if scope else []),
+            app_cred_ref=app_cred_ref if app_cred_ref is not None else key.provider,
+            token=token, rotation=rotation if rotation is not None else prov.rotation,
+            lease=None, created_by=principal_id, created_at=now, updated_at=now)
+        self.store.put_connection(conn)
+        return {"connectionId": conn.id}
 
     def finish_connect(self, code, state, code_verifier=None):
         data = verify_state(state, self.config.state_hmac_key)
