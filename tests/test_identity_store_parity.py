@@ -142,9 +142,11 @@ def test_island_registry_round_trip_and_lookup_by_audience():
             sso_token_url="https://app.unnest.se/sso/token",
             sso_client_secret_hash="deadbeef",
             org_id="org_unnest", session_ttl_days=30.0, created_at=1000.0,
+            assertion_secret="shh",
         )
         s.put_island(i)
         assert s.get_island("unnest") == i
+        assert s.get_island("unnest").assertion_secret == "shh"
         assert s.get_island_by_audience("https://mcp.unnest.se/mcp") == i
         assert s.get_island_by_audience("https://other") is None
         assert [x.id for x in s.list_islands()] == ["unnest"]

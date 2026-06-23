@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS logs(
 CREATE TABLE IF NOT EXISTS islands(
   id TEXT PRIMARY KEY, name TEXT, issuer TEXT, jwks_uri TEXT, audience TEXT,
   sso_authorize_url TEXT, sso_token_url TEXT, sso_client_secret_hash TEXT,
-  org_id TEXT, session_ttl_days REAL, created_at REAL, disabled_at REAL
+  org_id TEXT, session_ttl_days REAL, created_at REAL, disabled_at REAL,
+  assertion_secret TEXT
 );
 CREATE TABLE IF NOT EXISTS island_principal_links(
   island_id TEXT, island_user_id TEXT, principal_id TEXT, created_at REAL,
@@ -250,16 +251,17 @@ class ServerIdentityStore(IdentityStore):
     def put_island(self, i):
         with self._mu:
             self._db.execute(
-                "INSERT OR REPLACE INTO islands VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO islands VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (i.id, i.name, i.issuer, i.jwks_uri, i.audience, i.sso_authorize_url,
                  i.sso_token_url, i.sso_client_secret_hash, i.org_id, i.session_ttl_days,
-                 i.created_at, i.disabled_at))
+                 i.created_at, i.disabled_at, i.assertion_secret))
             self._db.commit()
 
     def _row_to_island(self, r):
         return IslandRegistry(id=r[0], name=r[1], issuer=r[2], jwks_uri=r[3], audience=r[4],
             sso_authorize_url=r[5], sso_token_url=r[6], sso_client_secret_hash=r[7],
-            org_id=r[8], session_ttl_days=r[9], created_at=r[10], disabled_at=r[11])
+            org_id=r[8], session_ttl_days=r[9], created_at=r[10], disabled_at=r[11],
+            assertion_secret=r[12])
 
     def get_island(self, island_id):
         r = self._db.execute("SELECT * FROM islands WHERE id=?", (island_id,)).fetchone()

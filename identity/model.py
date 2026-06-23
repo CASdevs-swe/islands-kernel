@@ -94,6 +94,7 @@ class IslandRegistry:
     session_ttl_days: float     # sizes the refresh token for this island
     created_at: float
     disabled_at: Optional[float] = None
+    assertion_secret: Optional[str] = None
 
 
 @dataclass
