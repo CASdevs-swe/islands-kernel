@@ -1,5 +1,6 @@
 import pytest
 from identity.store.memory import InMemoryIdentityStore
+from identity.model import IslandRegistry
 from identity.oauth.clients import register_client
 from identity.oauth.authorize_endpoint import issue_auth_code
 from identity.oauth.token_endpoint import redeem_code, refresh
@@ -49,3 +50,25 @@ def test_refresh_rotates_and_old_token_is_dead():
     # replay of the old refresh token must fail
     with pytest.raises(ValueError):
         refresh(s, refresh_token=issued["refresh_token"], now=2001)
+
+
+def _island(s, audience, days):
+    s.put_island(IslandRegistry(id="unnest", name="unnest", issuer="https://app.unnest.se",
+        jwks_uri="x", audience=audience, sso_authorize_url="x", sso_token_url="x",
+        sso_client_secret_hash="x", org_id="org_unnest", session_ttl_days=days, created_at=0.0))
+
+
+def test_refresh_ttl_is_sized_by_registered_island():
+    s, code, verifier = _setup()  # audience="https://mcp.x"
+    _island(s, "https://mcp.x", days=7.0)
+    redeem_code(s, code=code, code_verifier=verifier, audience="https://mcp.x", now=1001)
+    at_hash = next(iter(s.access_token_hashes()))
+    row = s.get_access_token(at_hash)
+    assert row.refresh["expires_at"] == 1001 + 7 * 86400
+
+
+def test_refresh_ttl_defaults_to_30_days_when_no_island():
+    s, code, verifier = _setup()
+    redeem_code(s, code=code, code_verifier=verifier, audience="https://mcp.x", now=1001)
+    row = s.get_access_token(next(iter(s.access_token_hashes())))
+    assert row.refresh["expires_at"] == 1001 + 30 * 86400
