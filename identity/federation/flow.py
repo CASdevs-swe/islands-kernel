@@ -4,7 +4,8 @@ from identity.tokens import generate_raw_token, hash_token
 from identity.model import FederationTxn
 from identity.oauth.clients import resolve_client, validate_redirect_uri
 from identity.oauth.authorize_endpoint import issue_auth_code
-from identity.federation.assertion import verify_island_assertion, IslandAssertionError
+from identity.federation.assertion import (verify_island_assertion,
+    verify_island_assertion_symmetric, IslandAssertionError)
 from identity.federation.principals import find_or_create_island_principal
 
 
@@ -48,16 +49,21 @@ def complete_federation(store, *, txn_id, sso_code, now, island_fetch, island_jw
         raise FederationError("island unavailable")
     try:
         assertion = island_fetch(island, sso_code)
-        jwks = island_jwks_fetch(island)
+        jwks = None if island.assertion_secret else island_jwks_fetch(island)
     except FederationError:
         raise
     except Exception:
         raise FederationError("island token exchange failed")
     try:
-        # the assertion's audience is the kernel issuer; passed in explicitly by the route layer
-        identity = verify_island_assertion(assertion, jwks=jwks,
-            expected_iss=island.issuer, expected_aud=kernel_issuer,
-            expected_nonce=txn.nonce, now=now)
+        if island.assertion_secret:
+            identity = verify_island_assertion_symmetric(assertion, secret=island.assertion_secret,
+                expected_iss=island.issuer, expected_aud=kernel_issuer,
+                expected_nonce=txn.nonce, now=now)
+        else:
+            # the assertion's audience is the kernel issuer; passed in explicitly by the route layer
+            identity = verify_island_assertion(assertion, jwks=jwks,
+                expected_iss=island.issuer, expected_aud=kernel_issuer,
+                expected_nonce=txn.nonce, now=now)
     except IslandAssertionError as e:
         raise FederationError(str(e))
     principal_id = find_or_create_island_principal(store, island=island,

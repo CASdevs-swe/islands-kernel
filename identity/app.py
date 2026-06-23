@@ -150,7 +150,7 @@ def _build_identity_app_from_env() -> FastAPI:
 
     def island_fetch(island, sso_code):
         r = httpx.post(island.sso_token_url, json={"sso_code": sso_code},
-                       headers={"x-kernel-secret": os.environ.get("KERNEL_SSO_SECRET", "")}, timeout=10)
+                       headers={"x-kernel-secret": island.assertion_secret or ""}, timeout=10)
         r.raise_for_status()
         return r.json()["assertion"]
 

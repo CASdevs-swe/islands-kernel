@@ -87,6 +87,40 @@ def test_island_fetch_transport_error_becomes_federation_error():
             kernel_issuer=KERNEL_ISS)
 
 
+def test_full_federation_with_symmetric_island():
+    s = InMemoryIdentityStore()
+    s.put_org(Org(id="org_unnest", name="unnest", created_at=0.0))
+    register_client(s, client_id="cli_1", name="Claude", redirect_uris=["https://claude.ai/cb"], type="public")
+    SHARED = "k" * 32
+    s.put_island(IslandRegistry(id="unnest", name="unnest", issuer=ISLAND_ISS,
+        jwks_uri="https://app.unnest.se/jwks", audience=AUD,
+        sso_authorize_url="https://app.unnest.se/sso/authorize",
+        sso_token_url="https://app.unnest.se/sso/token", sso_client_secret_hash="x",
+        org_id="org_unnest", session_ttl_days=30.0, created_at=0.0, assertion_secret=SHARED))
+    verifier = "v" * 64
+    redirect = start_federation(s, client_id="cli_1", redirect_uri="https://claude.ai/cb",
+        code_challenge=make_challenge(verifier), audience=AUD, scope="mcp",
+        client_state="STATE", return_uri=RETURN, now=1000)
+    q = dict(up.parse_qsl(up.urlsplit(redirect).query))
+    nonce = q["nonce"]
+
+    def island_fetch(island, sso_code):
+        claims = {"iss": ISLAND_ISS, "sub": "42", "aud": KERNEL_ISS, "nonce": nonce,
+                  "exp": 9999, "email": "a@b.se"}
+        return pyjwt.encode(claims, island.assertion_secret, algorithm="HS256")
+
+    def boom_jwks(island):
+        raise AssertionError("jwks must not be fetched for a symmetric island")
+
+    final = complete_federation(s, txn_id=q["txn"], sso_code="c", now=1100,
+        island_fetch=island_fetch, island_jwks_fetch=boom_jwks, kernel_issuer=KERNEL_ISS)
+    cq = dict(up.parse_qsl(up.urlsplit(final).query))
+    assert cq["state"] == "STATE"
+    out = redeem_code(s, code=cq["code"], code_verifier=verifier, audience=AUD, now=1200)
+    assert out["access_token"].startswith("at_")
+    assert s.get_principal_by_island("unnest", "42") is not None
+
+
 def test_replayed_txn_is_rejected():
     island_km = KeyManager.generate("island-1")
     s = _store(island_km)
