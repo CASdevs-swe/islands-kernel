@@ -1,6 +1,6 @@
 import pytest
 from identity.store.memory import InMemoryIdentityStore
-from identity.model import McpToken, Membership, OAuthAccessToken, Principal
+from identity.model import McpToken, Membership, OAuthAccessToken, Principal, IslandPrincipalLink
 from identity.tokens import hash_token
 from identity.exchange import exchange, ExchangeError
 
@@ -79,3 +79,18 @@ def test_type_defaults_to_human_when_no_principal_row():
     # prn_1 has a token and membership but no Principal row in store
     out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
     assert out["type"] == "human"
+
+
+def test_exchange_carries_island_native_id_for_linked_principal():
+    s = _store_with_mcp()  # principal_id="prn_1"
+    s.put_island_principal_link(IslandPrincipalLink(island_id="unnest", island_user_id="42",
+                                                    principal_id="prn_1", created_at=0.0))
+    out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
+    assert out["island"] == "unnest"
+    assert out["island_sub"] == "42"
+
+
+def test_exchange_island_fields_none_for_unlinked_principal():
+    s = _store_with_mcp()
+    out = exchange(opaque_token="mcp_abc", audience="https://mcp.x", store=s, now=1000)
+    assert out["island"] is None and out["island_sub"] is None

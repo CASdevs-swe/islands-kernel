@@ -19,6 +19,9 @@ def build_claims(
     scope: str,
     iat: int,
     exp: int,
+    island: Optional[str] = None,
+    island_sub: Optional[str] = None,
+    island_org: Optional[str] = None,
 ) -> dict:
     claims = {
         "iss": issuer,
@@ -38,6 +41,10 @@ def build_claims(
     }
     if perms is not None:
         claims["perms"] = perms
+    if island is not None:
+        claims["island"] = island
+        claims["island_sub"] = island_sub
+        claims["island_org"] = island_org
     return claims
 
 
@@ -65,6 +72,9 @@ def mint(
     perms: Optional[list] = None,
     sid: Optional[str] = None,
     scope: str = "mcp",
+    island: Optional[str] = None,
+    island_sub: Optional[str] = None,
+    island_org: Optional[str] = None,
 ) -> str:
     claims = build_claims(
         issuer=issuer,
@@ -79,5 +89,8 @@ def mint(
         scope=scope,
         iat=int(now),
         exp=int(now) + int(ttl),
+        island=island,
+        island_sub=island_sub,
+        island_org=island_org,
     )
     return mint_island_jwt(claims, km)

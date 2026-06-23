@@ -37,3 +37,19 @@ def test_mint_produces_verifiable_eddsa_token():
     decoded = pyjwt.decode(token, km._priv.public_key(), algorithms=["EdDSA"],
                            audience="https://mcp.x", options={"verify_exp": False})
     assert decoded["sub"] == "prn_1" and decoded["exp"] == 1300
+
+
+def test_build_claims_includes_island_native_id_when_present():
+    c = build_claims(issuer="https://id.x", sub="prn_1", typ="human", email=None, org="org_unnest",
+                     roles=["member"], perms=None, sid=None, audience="https://mcp.unnest.se/mcp",
+                     scope="mcp", iat=100, exp=400, island="unnest", island_sub="42", island_org="ws_7")
+    assert c["island"] == "unnest"
+    assert c["island_sub"] == "42"
+    assert c["island_org"] == "ws_7"
+
+
+def test_build_claims_omits_island_keys_when_absent():
+    c = build_claims(issuer="https://id.x", sub="prn_1", typ="service", email=None, org=None,
+                     roles=[], perms=None, sid=None, audience="https://mcp.x", scope="mcp",
+                     iat=100, exp=400)
+    assert "island" not in c and "island_sub" not in c and "island_org" not in c

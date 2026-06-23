@@ -63,7 +63,9 @@ def build_identity_app(*, store, key_manager, issuer: str, now_fn) -> FastAPI:
         token = mint(km=key_manager, issuer=issuer, sub=resolved["principal_id"],
                      typ=resolved["type"], audience=body.audience, org=resolved["org_id"],
                      roles=resolved["roles"], ttl=300, now=int(now),
-                     sid=resolved["sid"])
+                     sid=resolved["sid"],
+                     island=resolved.get("island"), island_sub=resolved.get("island_sub"),
+                     island_org=resolved.get("island_org"))
         return {"access_token": token, "token_type": "Bearer", "expires_in": 300}
 
     @app.post("/oauth/authorize")
