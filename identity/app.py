@@ -2,13 +2,15 @@ import os
 from typing import Optional, Union
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from identity.exchange import exchange, ExchangeError
 from identity.jwt_issuer import mint
-from identity.oauth.metadata import authorization_server_metadata, openid_configuration
+from identity.oauth.metadata import authorization_server_metadata, openid_configuration, protected_resource_metadata
 from identity.oauth.authorize_endpoint import issue_auth_code
 from identity.oauth.token_endpoint import redeem_code, refresh
+from identity.federation.flow import start_federation, complete_federation, FederationError
 
 
 class ExchangeRequest(BaseModel):
@@ -37,7 +39,8 @@ class TokenRequest(BaseModel):
     refresh_token: Optional[str] = None
 
 
-def build_identity_app(*, store, key_manager, issuer: str, now_fn) -> FastAPI:
+def build_identity_app(*, store, key_manager, issuer: str, now_fn,
+                       client_fetch=None, island_fetch=None, island_jwks_fetch=None) -> FastAPI:
     app = FastAPI(title="islands-kernel identity")
 
     @app.get("/.well-known/jwks.json")
@@ -98,11 +101,40 @@ def build_identity_app(*, store, key_manager, issuer: str, now_fn) -> FastAPI:
         except ValueError as e:
             raise HTTPException(400, str(e))
 
+    @app.get("/oauth/authorize")
+    async def oauth_authorize_browser(client_id: str, redirect_uri: str, code_challenge: str,
+            resource: str, scope: str = "mcp", state: str = "",
+            code_challenge_method: str = "S256"):
+        if code_challenge_method != "S256":
+            raise HTTPException(400, "unsupported code_challenge_method")
+        try:
+            target = start_federation(store, client_id=client_id, redirect_uri=redirect_uri,
+                code_challenge=code_challenge, audience=resource, scope=scope, client_state=state,
+                return_uri=f"{issuer}/oauth/callback", now=now_fn(), client_fetch=client_fetch)
+        except FederationError as e:
+            raise HTTPException(400, str(e))
+        return RedirectResponse(target, status_code=302)
+
+    @app.get("/oauth/callback")
+    async def oauth_callback(txn: str, sso_code: str):
+        try:
+            target = complete_federation(store, txn_id=txn, sso_code=sso_code, now=now_fn(),
+                island_fetch=island_fetch, island_jwks_fetch=island_jwks_fetch,
+                kernel_issuer=issuer)
+        except FederationError as e:
+            raise HTTPException(400, str(e))
+        return RedirectResponse(target, status_code=302)
+
+    @app.get("/.well-known/oauth-protected-resource")
+    async def oauth_protected_resource():
+        return protected_resource_metadata(resource=issuer, authorization_servers=[issuer])
+
     return app
 
 
 def _build_identity_app_from_env() -> FastAPI:
     import time
+    import httpx
     from identity.keys import KeyManager
     from identity.store.server import ServerIdentityStore
 
@@ -112,8 +144,23 @@ def _build_identity_app_from_env() -> FastAPI:
         raise RuntimeError("KERNEL_SIGNING_SEED is required to serve the identity kernel")
     km = KeyManager.from_seed(os.environ.get("KERNEL_KID", "kid-1"), seed)
     store = ServerIdentityStore(os.environ.get("KERNEL_IDENTITY_DB", "vault-store/identity.sqlite"))
+
+    def client_fetch(url):
+        return httpx.get(url, timeout=10).raise_for_status().json()
+
+    def island_fetch(island, sso_code):
+        r = httpx.post(island.sso_token_url, json={"sso_code": sso_code},
+                       headers={"x-kernel-secret": os.environ.get("KERNEL_SSO_SECRET", "")}, timeout=10)
+        r.raise_for_status()
+        return r.json()["assertion"]
+
+    def island_jwks_fetch(island):
+        return httpx.get(island.jwks_uri, timeout=10).raise_for_status().json()
+
     return build_identity_app(store=store, key_manager=km,
-                              issuer=os.environ["KERNEL_ISSUER"], now_fn=time.time)
+                              issuer=os.environ["KERNEL_ISSUER"], now_fn=time.time,
+                              client_fetch=client_fetch, island_fetch=island_fetch,
+                              island_jwks_fetch=island_jwks_fetch)
 
 
 app = _build_identity_app_from_env() if os.environ.get("IDENTITY_BOOT") == "1" else None

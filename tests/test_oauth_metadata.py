@@ -25,3 +25,9 @@ def test_oidc_discovery_subset():
     m = openid_configuration(issuer="https://id.x")
     assert m["issuer"] == "https://id.x"
     assert m["jwks_uri"] == "https://id.x/.well-known/jwks.json"
+
+
+def test_as_metadata_advertises_cimd_and_none_auth():
+    m = authorization_server_metadata(issuer="https://id.x")
+    assert m["client_id_metadata_document_supported"] is True
+    assert "none" in m["token_endpoint_auth_methods_supported"]
