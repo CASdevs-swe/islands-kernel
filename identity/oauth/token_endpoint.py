@@ -41,7 +41,7 @@ def redeem_code(store, *, code, code_verifier, audience, now, access_ttl=3600, r
         raise ValueError("unknown code")
     if now >= row.expires_at:
         raise ValueError("code expired")
-    if row.audience != audience:
+    if audience is not None and row.audience != audience:
         raise ValueError("audience mismatch")
     if not verify_pkce_s256(verifier=code_verifier, challenge=row.code_challenge):
         raise ValueError("pkce verification failed")

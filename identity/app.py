@@ -1,7 +1,7 @@
 import os
 from typing import Optional, Union
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -87,14 +87,34 @@ def build_identity_app(*, store, key_manager, issuer: str, now_fn,
         return {"code": code}
 
     @app.post("/oauth/token")
-    async def oauth_token(body: TokenRequest):
+    async def oauth_token(request: Request):
+        # OAuth 2.1 token requests are application/x-www-form-urlencoded; accept that
+        # (what real clients send) as well as JSON (internal callers).
+        ct = request.headers.get("content-type", "")
+        if ct.startswith("application/x-www-form-urlencoded"):
+            # Parse the urlencoded body directly (no python-multipart dependency).
+            from urllib.parse import parse_qsl
+            raw = dict(parse_qsl((await request.body()).decode("utf-8", "replace")))
+        else:
+            try:
+                raw = await request.json()
+            except Exception:
+                raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
+        # RFC 8707: clients send `resource` in the token request; map it to our audience.
+        if not raw.get("audience") and raw.get("resource"):
+            raw["audience"] = raw["resource"]
+        body = TokenRequest(**{k: v for k, v in raw.items() if k in TokenRequest.model_fields})
         try:
             if body.grant_type == "refresh_token":
                 if body.refresh_token is None:
                     raise ValueError("refresh_token is required")
                 return refresh(store, refresh_token=body.refresh_token, now=now_fn())
-            if None in (body.code, body.code_verifier, body.audience):
-                raise ValueError("code, code_verifier and audience are required")
+            if body.code is None or body.code_verifier is None:
+                raise ValueError("code and code_verifier are required")
+            # `resource`/audience is optional in the token request — it is already bound
+            # to the auth code; when supplied it must match (enforced in redeem_code).
             return redeem_code(store, code=body.code,
                                code_verifier=body.code_verifier,
                                audience=body.audience, now=now_fn())
