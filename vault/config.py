@@ -40,6 +40,10 @@ class VaultConfig:
     skew: int = 60
 
     def app_cred_for(self, provider: str, ref: str) -> AppCred:
-        if provider not in self.app_creds:
-            raise KeyError(f"no app credential configured for provider {provider}")
-        return self.app_creds[provider]
+        # Honor the per-connection app-cred ref (falling back to the provider
+        # default) so a connection refreshes with the app that minted it.
+        cred = self.app_creds.get(ref) or self.app_creds.get(provider)
+        if cred is None:
+            raise KeyError(
+                f"no app credential configured for provider {provider} (ref {ref})")
+        return cred
